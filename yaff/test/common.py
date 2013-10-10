@@ -36,7 +36,11 @@ __all__ = [
     'get_system_cyclopropene', 'get_system_caffeine', 'get_system_butanol',
     'get_system_2T', 'get_system_peroxide', 'get_system_mil53',
     'get_system_2atoms', 'get_2systems_2oxygens', 'get_system_formaldehyde',
+<<<<<<< HEAD
     'get_system_amoniak', 'get_system_4113_01WaterWater',
+=======
+    'get_system_amoniak', 'get_nacl_cubic'
+>>>>>>> Rewrite of yaff.sampling.dof
 ]
 
 
@@ -488,6 +492,7 @@ def get_system_formaldehyde():
         bonds=np.array([[0,1],[0,2],[0,3]]),
     )
 
+
 def get_system_amoniak():
     return System(
         numbers=np.array([7, 1, 1, 1]),
@@ -528,3 +533,18 @@ def get_system_4113_01WaterWater():
                     charges=charges, radii=slater_widths,
                     valence_charges=slater_charges)
     return system
+
+
+def get_system_nacl_cubic():
+    r0 = 2.82*angstrom
+    return System(
+        numbers=np.array([11, 11, 11, 11, 17, 17, 17, 17]),
+        ffatypes=['Na', 'Na', 'Na', 'Na', 'Cl', 'Cl', 'Cl', 'Cl'],
+        charges=np.array([1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0]),
+        pos = np.array([
+            [0, 0, 0], [1, 1, 0], [1, 0, 1.01], [0, 1, 1],
+            [1.01, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 1]
+        ])*r0,
+        rvecs=np.identity(3)*(2*r0),
+        bonds=[],
+    )
