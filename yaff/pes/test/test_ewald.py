@@ -147,6 +147,35 @@ def check_dielectric(system):
     assert abs(vtenss - vtenss.mean(axis=0)).max() < 1e-8
 
 
+def check_dielectric(system):
+    # Idea: Using a relative permittivity epsilon (!=1) should give the same
+    # results as epsilon==1 with all charges scaled by 1.0/sqrt(epsilon)
+    # Initialize
+    original_charges = system.charges.copy()
+    energies = []
+    gposs = []
+    vtenss = []
+    dielectric = 1.44
+    # Use scaled charges and epsilon=1
+    system.charges = original_charges/np.sqrt(dielectric)
+    energy, gpos, vtens = get_electrostatic_energy(0.2, system)
+    energies.append(energy)
+    gposs.append(gpos)
+    vtenss.append(vtens)
+    # Use original charges and epsilon=dielectric
+    system.charges = original_charges
+    energy, gpos, vtens = get_electrostatic_energy(0.2, system, dielectric=dielectric)
+    energies.append(energy)
+    gposs.append(gpos)
+    vtenss.append(vtens)
+    energies = np.array(energies)
+    gposs = np.array(gposs)
+    vtenss = np.array(vtenss)
+    assert abs(energies - energies.mean()).max() < 1e-8
+    assert abs(gposs - gposs.mean(axis=0)).max() < 1e-8
+    assert abs(vtenss - vtenss.mean(axis=0)).max() < 1e-8
+
+
 def get_electrostatic_energy(alpha, system, dielectric=1.0):
     # Create tools needed to evaluate the energy
     nlist = NeighborList(system)
