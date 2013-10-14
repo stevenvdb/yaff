@@ -37,7 +37,7 @@ double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *d
                           double gcut, double *gpos, double *work,
                           double* vtens);
 double compute_ewald_corr(double *pos, double *charges,
-                          cell_type *unitcell, double alpha,
+                          cell_type *unitcell, double alpha, double dielectric,
                           scaling_row_type *stab, long stab_size,
                           double dielectric, double *gpos, double *vtens,
                           double *hess, long natom);

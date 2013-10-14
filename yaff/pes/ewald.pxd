@@ -48,6 +48,7 @@ cdef extern from "ewald.h":
                               pair_pot.scaling_row_type *stab,
                               long stab_size, double *gpos, double *vtens,
                               long natom)
+
     double compute_ewald_corr_dd(double *pos, double *charges, double *dipoles,
                               cell.cell_type *unitcell, double alpha,
                               pair_pot.scaling_row_type *stab,

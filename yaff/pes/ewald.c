@@ -379,7 +379,7 @@ double compute_ewald_corr(double *pos, double *charges,
   // Self-interaction correction (no gpos or vtens or hess contribution)
   x = alpha/M_SQRT_PI;
   for (i = 0; i < natom; i++) {
-    energy -= x*charges[i]*charges[i];
+    energy -= x*charges[i]*charges[i]/dielectric;
   }
   // Scaling corrections
   for (i = 0; i < nstab; i++) {
@@ -392,7 +392,7 @@ double compute_ewald_corr(double *pos, double *charges,
     d = sqrt(delta[0]*delta[0] + delta[1]*delta[1] + delta[2]*delta[2]);
     x = alpha*d;
     pot = erf(x)/d;
-    fac = (1-stab[i].scale)*charges[other_index]*charges[center_index];
+    fac = (1-stab[i].scale)*charges[other_index]*charges[center_index]/dielectric;
     if ((gpos != NULL) || (vtens != NULL)) {
       rmin2 = 1.0/(d*d);
       g = -fac*(M_TWO_DIV_SQRT_PI*alpha*exp(-x*x) - pot)*rmin2;

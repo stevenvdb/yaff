@@ -1492,6 +1492,10 @@ cdef class PairPotDisp68BJDamp(PairPot):
             The R cross parameters. If not supplied, these are computed as
             sqrt(C8/C6).
 
+        dielectric
+            A relative dielectric permitivity that just scales the Coulomb
+            interaction.
+
         rcut
             The cutoff radius
 
@@ -2526,7 +2530,7 @@ def compute_ewald_reci_dd(np.ndarray[double, ndim=2] pos,
 
 def compute_ewald_corr(np.ndarray[double, ndim=2] pos,
                        np.ndarray[double, ndim=1] charges,
-                       Cell unitcell, double alpha,
+                       Cell unitcell, double alpha, double dielectric,
                        np.ndarray[pair_pot.scaling_row_type, ndim=1] stab,
                        double dielectric,
                        np.ndarray[double, ndim=2] gpos,
@@ -2549,6 +2553,9 @@ def compute_ewald_corr(np.ndarray[double, ndim=2] pos,
 
        alpha
             The :math:`\\alpha` parameter from the Ewald summation scheme.
+
+       dielectric
+            The scalar relative permittivity of the system.
 
        stab
             The table with (sorted) pairs of atoms whose electrostatic
