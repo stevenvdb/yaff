@@ -68,8 +68,9 @@ cdef extern from "pair_pot.h":
     double pair_data_disp68bjdamp_get_bj_a(pair_pot_type *pair_pot)
     double pair_data_disp68bjdamp_get_bj_b(pair_pot_type *pair_pot)
 
-    void pair_data_ei_init(pair_pot_type *pair_pot, double *charges, double alpha, double *radii)
+    void pair_data_ei_init(pair_pot_type *pair_pot, double *charges, double alpha, double dielectric, double *radii)
     double pair_data_ei_get_alpha(pair_pot_type *pair_pot)
+    double pair_data_ei_get_dielectric(pair_pot_type *pair_pot)
 
     void pair_data_eidip_init(pair_pot_type *pair_pot, double *charges, double *dipoles, double alpha, double *radii, double *radii2)
     double pair_data_eidip_get_alpha(pair_pot_type *pair_pot)

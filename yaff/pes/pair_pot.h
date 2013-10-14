@@ -144,12 +144,14 @@ double pair_data_disp68bjdamp_get_bj_b(pair_pot_type *pair_pot);
 typedef struct {
   double *charges;
   double alpha;
+  double dielectric;
   double *radii;
 } pair_data_ei_type;
 
-void pair_data_ei_init(pair_pot_type *pair_pot, double *charges, double alpha);
-double pair_fn_ei(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *g_cart);
+void pair_data_ei_init(pair_pot_type *pair_pot, double *charges, double alpha, double dielectric, double *radii);
+double pair_fn_ei(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *g_cart);
 double pair_data_ei_get_alpha(pair_pot_type *pair_pot);
+double pair_data_ei_get_dielectric(pair_pot_type *pair_pot);
 
 
 typedef struct {

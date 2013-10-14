@@ -326,7 +326,7 @@ class ForcePartEwaldReciprocal(ForcePart):
     '''The long-range contribution to the electrostatic interaction in 3D
        periodic systems.
     '''
-    def __init__(self, system, alpha, gcut=0.35):
+    def __init__(self, system, alpha, dielectric, gcut=0.35):
         '''
            **Arguments:**
 
@@ -335,6 +335,9 @@ class ForcePartEwaldReciprocal(ForcePart):
 
            alpha
                 The alpha parameter in the Ewald summation method.
+
+           dielectric
+                The scalar relative permittivity of the system.
 
            gcut
                 The cutoff in reciprocal space.
@@ -346,6 +349,7 @@ class ForcePartEwaldReciprocal(ForcePart):
             raise ValueError('The system does not have charges.')
         self.system = system
         self.alpha = alpha
+        self.dielectric = dielectric
         self.gcut = gcut
         self.update_gmax()
         self.work = np.empty(system.natom*2)
@@ -374,7 +378,7 @@ class ForcePartEwaldReciprocal(ForcePart):
         with timer.section('Ewald reci.'):
             return compute_ewald_reci(
                 self.system.pos, self.system.charges, self.system.cell, self.alpha,
-                self.gmax, self.gcut, gpos, self.work, vtens
+                self.dielectric, self.gmax, self.gcut, gpos, self.work, vtens
             )
 
 
@@ -442,7 +446,7 @@ class ForcePartEwaldCorrection(ForcePart):
        This correction is only needed if scaling rules apply to the short-range
        electrostatics.
     '''
-    def __init__(self, system, alpha, scalings):
+    def __init__(self, system, alpha, dielectric, scalings):
         '''
            **Arguments:**
 
@@ -451,6 +455,9 @@ class ForcePartEwaldCorrection(ForcePart):
 
            alpha
                 The alpha parameter in the Ewald summation method.
+
+           dielectric
+                The scalar relative permittivity of the system.
 
            scalings
                 A ``Scalings`` object. This object contains all the information
@@ -465,6 +472,7 @@ class ForcePartEwaldCorrection(ForcePart):
             raise ValueError('The system does not have charges.')
         self.system = system
         self.alpha = alpha
+        self.dielectric = dielectric
         self.scalings = scalings
         if log.do_medium:
             with log.section('FPINIT'):
@@ -478,7 +486,7 @@ class ForcePartEwaldCorrection(ForcePart):
         with timer.section('Ewald corr.'):
             return compute_ewald_corr(
                 self.system.pos, self.system.charges, self.system.cell,
-                self.alpha, self.scalings.stab, gpos, vtens
+                self.alpha, self.dielectric, self.scalings.stab, gpos, vtens
             )
 
 
@@ -542,6 +550,10 @@ class ForcePartEwaldNeutralizing(ForcePart):
 
            alpha
                 The alpha parameter in the Ewald summation method.
+
+           dielectric
+                The scalar relative permittivity of the system.
+
         '''
         ForcePart.__init__(self, 'ewald_neut', system)
         if not system.cell.nvec == 3:
@@ -550,6 +562,7 @@ class ForcePartEwaldNeutralizing(ForcePart):
             raise ValueError('The system does not have charges.')
         self.system = system
         self.alpha = alpha
+        self.dielectric = dielectric
         if log.do_medium:
             with log.section('FPINIT'):
                 log('Force part: %s' % self.name)
@@ -560,9 +573,9 @@ class ForcePartEwaldNeutralizing(ForcePart):
     def _internal_compute(self, gpos, vtens):
         with timer.section('Ewald neut.'):
             #TODO: interaction of dipoles with background? I think this is zero, need proof...
-            fac = self.system.charges.sum()**2*np.pi/(2.0*self.system.cell.volume*self.alpha**2)
+            fac = self.system.charges.sum()**2*np.pi/(2.0*self.system.cell.volume*self.alpha**2)/self.dielectric
             if self.system.radii is not None:
-                fac -= self.system.charges.sum()*np.pi/(2.0*self.system.cell.volume)*np.sum( self.system.charges*self.system.radii**2 )
+                fac -= self.system.charges.sum()*np.pi/(2.0*self.system.cell.volume)*np.sum( self.system.charges*self.system.radii**2 )/self.dielectric
             if vtens is not None:
                 vtens.ravel()[::4] -= fac
             return fac
