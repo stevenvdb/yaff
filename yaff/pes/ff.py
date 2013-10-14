@@ -358,6 +358,7 @@ class ForcePartEwaldReciprocal(ForcePart):
                 log('Force part: %s' % self.name)
                 log.hline()
                 log('  alpha:             %s' % log.invlength(self.alpha))
+                log('  relative permittivity   %5.3f' % self.dielectric )
                 log('  gcut:              %s' % log.invlength(self.gcut))
                 log.hline()
 
@@ -479,6 +480,7 @@ class ForcePartEwaldCorrection(ForcePart):
                 log('Force part: %s' % self.name)
                 log.hline()
                 log('  alpha:             %s' % log.invlength(self.alpha))
+                log('  relative permittivity   %5.3f' % self.dielectric )
                 log('  scalings:          %5.3f %5.3f %5.3f' % (scalings.scale1, scalings.scale2, scalings.scale3))
                 log.hline()
 
@@ -568,6 +570,7 @@ class ForcePartEwaldNeutralizing(ForcePart):
                 log('Force part: %s' % self.name)
                 log.hline()
                 log('  alpha:             %s' % log.invlength(self.alpha))
+                log('  relative permittivity   %5.3f' % self.dielectric )
                 log.hline()
 
     def _internal_compute(self, gpos, vtens):
