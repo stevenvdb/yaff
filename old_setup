@@ -1,0 +1,3 @@
+            #extra_link_args = [-L/home/steven/build/lammps-ro/src,-llammps_mpi,-lfftw,-lmpich,-lmpl,-lpthread],
+            #extra_compile_args = [-I/home/steven/build/lammps-ro/src],
+

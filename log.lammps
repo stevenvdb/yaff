@@ -1,0 +1,58 @@
+LAMMPS (21 Jan 2015)
+units electron
+atom_style full
+atom_modify	map array
+read_data lammps.data
+  triclinic box = (0 0 0) to (20.4288 18.57 16.0822) with tilt (0 0 9.28501)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  72 atoms
+  scanning bonds ...
+  4 = max bonds/atom
+  reading bonds ...
+  96 bonds
+  4 = max # of 1-2 neighbors
+  6 = max # of 1-3 neighbors
+  16 = max # of 1-4 neighbors
+  20 = max # of special neighbors
+mass 1 1.0
+mass 2 1.0
+bond_style none
+pair_style hybrid/overlay coul/long 24.0 table spline 5000
+pair_coeff * * coul/long
+kspace_style pppm 0.000001
+pair_coeff 1 1 table lammps.table 000-000
+pair_coeff 1 2 table lammps.table 000-001
+pair_coeff 2 2 table lammps.table 001-001
+special_bonds lj 0.800000 0.250000 0.100000 coul 0.200000 0.400000 0.300000
+  4 = max # of 1-2 neighbors
+  6 = max # of 1-3 neighbors
+  16 = max # of 1-4 neighbors
+  20 = max # of special neighbors
+neighbor 0.0 bin
+neigh_modify delay 0 every 1 check no
+fix 1 all nve
+variable energy equal pe
+compute virial all pressure NULL virial
+change_box all x final 0.000000        20.42877854609219667736 y final 0.000000        18.57002124405364540394 z final 0.000000        16.08215143531910484853 xy final         0.00000000000000000000 xz final         0.00000000000000000000 yz final         9.28501062202682270197
+
+  triclinic box = (0 0 0) to (20.4288 18.57 16.0822) with tilt (0 0 9.28501)
+  triclinic box = (0 0 0) to (20.4288 18.57 16.0822) with tilt (0 0 9.28501)
+  triclinic box = (0 0 0) to (20.4288 18.57 16.0822) with tilt (0 0 9.28501)
+  triclinic box = (0 0 0) to (20.4288 18.57 16.0822) with tilt (0 0 9.28501)
+  triclinic box = (0 0 0) to (20.4288 18.57 16.0822) with tilt (0 0 9.28501)
+  triclinic box = (0 0 0) to (20.4288 18.57 16.0822) with tilt (0 0 9.28501)
+run 0 post no
+PPPM initialization ...
+  G vector (1/distance) = 0.150671
+  grid = 18 16 24
+  stencil order = 5
+  estimated absolute RMS force accuracy = 1.96317e-07
+  estimated relative force accuracy = 7.01062e-07
+  using double precision FFTs
+  3d grid and FFT values/proc = 14007 6912
+WARNING: Inconsistent image flags (../domain.cpp:678)
+Memory usage per processor = 8.35914 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+       0            0    27.411306            0    27.411306 4.9670434e+10 
+Loop time of 1.90735e-06 on 1 procs for 0 steps with 72 atoms

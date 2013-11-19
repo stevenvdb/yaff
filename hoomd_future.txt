@@ -1,0 +1,249 @@
+#        Extension("yaff.pes.hoomdyaff",
+#            sources=['yaff/pes/hoomdyaff.pyx','yaff/pes/hoomd.cpp'],
+#            depends=['yaff/pes/hoomd.h','yaff/pes/hoomd.pxd'],
+#            include_dirs=[np.get_include(),],
+#            libraries=['boost_system'],
+#            extra_link_args=["-L/home/steven/bin/hoomd-install/lib/hoomd/python-module","-L/usr/lib/"],#"-DSOME_DEFINE_OPT", 
+#                               #"-L./some/extra/dependency/dir/"]
+#            language="c++",),
+ 
+
+# -*- coding: utf-8 -*-
+# YAFF is yet another force-field code
+# Copyright (C) 2011 - 2013 Toon Verstraelen <Toon.Verstraelen@UGent.be>,
+# Louis Vanduyfhuys <Louis.Vanduyfhuys@UGent.be>, Center for Molecular Modeling
+# (CMM), Ghent University, Ghent, Belgium; all rights reserved unless otherwise
+# stated.
+#
+# This file is part of YAFF.
+#
+# YAFF is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 3
+# of the License, or (at your option) any later version.
+#
+# YAFF is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, see <http://www.gnu.org/licenses/>
+#
+#--
+
+
+import numpy as np
+from datetime import datetime
+
+from yaff import *
+
+from yaff.test.common import get_system_water32, get_system_quartz
+from yaff.pes.test.common import check_gpos_part, check_vtens_part
+#from yaff.pes.hoomdyaff import run_hoomd
+from yaff.pes.hoomd import *
+
+#import ctypes
+#ctypes.CDLL('libmpi.so.0', ctypes.RTLD_GLOBAL)
+import numpy as np
+#from hoomd_script import *
+
+import math
+
+
+def get_electrostatic_energy(alpha, system, nlist, scalings):
+    # Construct the ewald real-space potential and part
+    ewald_real_pot = PairPotEI(system.charges, alpha, rcut=5.5/alpha)
+    part_pair_ewald_real = ForcePartPair(system, nlist, scalings, ewald_real_pot)
+    assert part_pair_ewald_real.pair_pot.alpha == alpha
+    # Construct the ewald reciprocal and correction part
+    part_ewald_reci = ForcePartEwaldReciprocal(system, alpha, gcut=2.0*alpha)
+    assert part_ewald_reci.alpha == alpha
+    part_ewald_corr = ForcePartEwaldCorrection(system, alpha, scalings)
+    assert part_ewald_corr.alpha == alpha
+    # Construct the force field
+    ff = ForceField(system, [part_pair_ewald_real, part_ewald_reci, part_ewald_corr], nlist)
+    ff.update_pos(system.pos)
+    ff.update_rvecs(system.cell.rvecs)
+    gpos = np.zeros(system.pos.shape, float)
+    vtens = np.zeros((3, 3), float)
+    energy = ff.compute(gpos, vtens)
+    print '    # %4.2f' % alpha, ' '.join('%15.7e' % part.energy for part in ff.parts)
+    return energy, gpos, vtens
+
+def test_hoomd_forces():
+    run_hoomd()
+
+def test_hoomd_speed():
+    globals.options.notice_level = 0;
+    globals.msg.setNoticeLevel(0);
+
+    system = get_system_water32()
+    system = system.supercell(2,2,2)
+    print system.natom
+    time1 = datetime.now()
+    # Use HOOMD
+    system_hoomd = init.create_empty(N=system.natom, box=data.boxdim(L=system.cell.rvecs[0,0]), bond_types=["A"])
+    for i, p in enumerate(system_hoomd.particles):
+        p.charge = system.charges[i]
+    charged = group.charged();
+
+    pppm = charge.pppm(group=charged)
+
+    pppm.set_params(Nx=64, Ny=64, Nz=64, order=6, rcut=5.0)
+    integrate.mode_standard(dt=1e-10)
+    integrate.nvt(group=charged, T=0.1, tau=1.0)
+    logger = analyze.log(filename='mylog.log', period=1,
+                      quantities=['potential_energy','pressure_xx','pressure_yy','pressure_zz','pressure_xy','pressure_yz','pressure_xz'])
+
+    vtens = np.zeros((3,3))
+    gpos = np.zeros((system.natom,3))
+    #system_hoomd.bonds.add("A",0,1)
+    #print system_hoomd.bonds[0]
+
+    for j in xrange(1):
+        for i, p in enumerate(system_hoomd.particles):
+            p.position = (system.pos[i,0],system.pos[i,1],system.pos[i,2])
+        run(1)
+        energy = logger.query('potential_energy')
+        vtens[0,0] = logger.query('pressure_xx')
+        vtens[0,1] = logger.query('pressure_xy')
+        vtens[0,2] = logger.query('pressure_xz')
+        vtens[1,0] = logger.query('pressure_xy')
+        vtens[1,1] = logger.query('pressure_yy')
+        vtens[1,2] = logger.query('pressure_yz')
+        vtens[2,0] = logger.query('pressure_xz')
+        vtens[2,1] = logger.query('pressure_yz')
+        vtens[2,2] = logger.query('pressure_zz')
+        vtens *= -system.cell.rvecs[0,0]**3
+        gpos[:] = 0.0
+        for i, p in enumerate(system_hoomd.particles):
+            gpos[i] = -np.asarray(pppm.forces[i].force)
+            gpos[i] -= np.asarray(globals.forces[1].forces[i].force)
+
+
+    time2 = datetime.now()
+    print "Orginal: E = %14.10f | t = %6.2f" % (energy, (time2-time1).total_seconds())
+    assert False
+
+
+def test_p3m_scafacos_water32():
+    """
+    Compare EI from Ewald-Yaff with P3M-ScaFaCoS
+    """
+    system = get_system_water32()
+    #system = system.supercell(2,2,2)
+    print system.natom
+    # Set Ewald parameter
+    alpha = 1.0
+    # Create tools needed to evaluate the energy
+    nlist = NeighborList(system)
+    scalings = Scalings(system, 0.0,0.0,0.0)
+    # Use original Yaff Ewald implementation
+    time0 = datetime.now()
+    energy1, gpos1, vtens1 = 0.0,0.0,0.0
+    energy1, gpos1, vtens1 = get_electrostatic_energy(alpha, system, nlist, scalings)
+    time1 = datetime.now()
+    # Use HOOMD
+    system_hoomd = init.create_empty(N=system.natom, box=data.boxdim(L=system.cell.rvecs[0,0]), bond_types=["A"], angle_types=["B"], dihedral_types=["C"])
+
+    for bond in system.bonds:system_hoomd.bonds.add("A",bond[0],bond[1])
+    for angle in system.iter_angles(): system_hoomd.angles.add("B",angle[0],angle[1],angle[2])
+    for dihedral in system.iter_dihedrals(): system_hoomd.dihedrals.add("C",dihedral[0],dihedral[1],dihedral[2],dihedral[3])
+
+
+    for i, p in enumerate(system_hoomd.particles):
+        p.charge = system.charges[i]
+    charged = group.charged();
+
+    pppm = charge.pppm(group=charged)
+
+
+    pppm.set_params(Nx=64, Ny=64, Nz=64, order=6, rcut=5.0)
+
+    globals.neighbor_list.reset_exclusions(["1-2","1-3","1-4"])
+
+    integrate.mode_standard(dt=1e-10)
+    integrate.nvt(group=charged, T=0.1, tau=1.0)
+    logger = analyze.log(filename='mylog.log', period=1,
+                      quantities=['potential_energy','pressure_xx','pressure_yy','pressure_zz','pressure_xy','pressure_yz','pressure_xz'])
+
+    for j in xrange(1):
+        for i, p in enumerate(system_hoomd.particles):
+            p.position = (system.pos[i,0],system.pos[i,1],system.pos[i,2])
+        run(1)
+        energy2 = logger.query('potential_energy')
+        vtens2 = np.zeros((3,3))
+        vtens2[0,0] = logger.query('pressure_xx')
+        vtens2[0,1] = logger.query('pressure_xy')
+        vtens2[0,2] = logger.query('pressure_xz')
+        vtens2[1,0] = logger.query('pressure_xy')
+        vtens2[1,1] = logger.query('pressure_yy')
+        vtens2[1,2] = logger.query('pressure_yz')
+        vtens2[2,0] = logger.query('pressure_xz')
+        vtens2[2,1] = logger.query('pressure_yz')
+        vtens2[2,2] = logger.query('pressure_zz')
+        vtens2 *= -system.cell.rvecs[0,0]**3
+        gpos2 = np.zeros((system.natom,3))
+        for i, p in enumerate(system_hoomd.particles):
+            gpos2[i] = -np.asarray(pppm.forces[i].force)
+            gpos2[i] -= np.asarray(globals.forces[1].forces[i].force)
+
+
+    time2 = datetime.now()
+    print "Orginal: E = %14.10f | t = %6.2f" % (energy1, (time1-time0).total_seconds())
+    print "Orginal: E = %14.10f | t = %6.2f" % (energy2, (time2-time1).total_seconds())
+    print "Relative error energy: %3.1e" % np.abs((energy1-energy2)/energy1)
+    print "Maximal error force: %3.1e" % np.amax(np.abs(gpos1 - gpos2))
+    print "Maximal relative error virial: %3.1e" % np.amax(np.abs((vtens1-vtens2)/vtens1))
+    assert np.abs((energy1-energy2)/energy1) < 1e-4
+    assert np.amax(np.abs(gpos1 - gpos2)) < 1e-4
+    assert np.amax(np.abs((vtens1-vtens2)/vtens1)) < 1e-4
+    assert False
+
+def diffpr(hx, hy, hz, xprd, yprd, zprd, N, order, kappa, q2, rcut):
+    lprx = rms(hx, xprd, N, order, kappa, q2)
+    lpry = rms(hy, yprd, N, order, kappa, q2)
+    lprz = rms(hz, zprd, N, order, kappa, q2)
+    kspace_prec = math.sqrt(lprx*lprx + lpry*lpry + lprz*lprz) / np.sqrt(3.0)
+    real_prec = 2.0*q2 * math.exp(-kappa*kappa*rcut*rcut)/np.sqrt(N*rcut*xprd*yprd*zprd)
+    value = kspace_prec - real_prec
+    return value
+
+def rms(h, prd, N, order, kappa, q2):
+    acons = [[0 for _ in range(8)] for _ in range(8)]
+
+    acons[1][0] = 2.0 / 3.0
+    acons[2][0] = 1.0 / 50.0
+    acons[2][1] = 5.0 / 294.0
+    acons[3][0] = 1.0 / 588.0
+    acons[3][1] = 7.0 / 1440.0
+    acons[3][2] = 21.0 / 3872.0
+    acons[4][0] = 1.0 / 4320.0
+    acons[4][1] = 3.0 / 1936.0
+    acons[4][2] = 7601.0 / 2271360.0
+    acons[4][3] = 143.0 / 28800.0
+    acons[5][0] = 1.0 / 23232.0
+    acons[5][1] = 7601.0 / 13628160.0
+    acons[5][2] = 143.0 / 69120.0
+    acons[5][3] = 517231.0 / 106536960.0
+    acons[5][4] = 106640677.0 / 11737571328.0
+    acons[6][0] = 691.0 / 68140800.0
+    acons[6][1] = 13.0 / 57600.0
+    acons[6][2] = 47021.0 / 35512320.0
+    acons[6][3] = 9694607.0 / 2095994880.0
+    acons[6][4] = 733191589.0 / 59609088000.0
+    acons[6][5] = 326190917.0 / 11700633600.0
+    acons[7][0] = 1.0 / 345600.0
+    acons[7][1] = 3617.0 / 35512320.0
+    acons[7][2] = 745739.0 / 838397952.0
+    acons[7][3] = 56399353.0 / 12773376000.0
+    acons[7][4] = 25091609.0 / 1560084480.0
+    acons[7][5] = 1755948832039.0 / 36229939200000.0
+    acons[7][6] = 4887769399.0 / 37838389248.0
+
+    sum = 0.0
+    for m in range(0,order):
+        sum += acons[order][m]*pow(h*kappa, 2.0*m)
+    value = q2*pow(h*kappa,order)*np.sqrt(kappa*prd*np.sqrt(2.0*math.pi)*sum/N)/prd/prd
+    return value
