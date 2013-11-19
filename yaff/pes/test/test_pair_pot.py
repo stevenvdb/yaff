@@ -673,6 +673,13 @@ def test_pair_pot_ei_water32_dielectric():
 
 
 
+def test_pair_pot_eidip_water():
+    #Setup system and force part
+    system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip()
+    #Check energy from Yaff with manually computed energy
+    check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, 1.0e-12)
+
+
 #
 # Caffeine tests
 #
