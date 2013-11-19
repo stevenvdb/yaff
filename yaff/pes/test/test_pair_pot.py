@@ -410,7 +410,6 @@ def check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, 
     energy1 = part_pair.compute()
     gpos = np.zeros(system.pos.shape, float)
     energy2 = part_pair.compute(gpos)
-    print gpos
     # Compute the energy manually
     check_energy = 0.0
     srow = 0
