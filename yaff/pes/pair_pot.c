@@ -28,7 +28,6 @@
 #include "pair_pot.h"
 #include "slater.h"
 
-
 pair_pot_type* pair_pot_new(void) {
   pair_pot_type* result;
   result = malloc(sizeof(pair_pot_type));
@@ -60,7 +59,6 @@ void pair_pot_set_rcut(pair_pot_type *pair_pot, double rcut) {
 void pair_pot_set_trunc_scheme(pair_pot_type *pair_pot, trunc_scheme_type *trunc_scheme) {
   (*pair_pot).trunc_scheme = trunc_scheme;
 }
-
 
 double get_scaling(scaling_row_type *stab, long a, long b, long *row, long size) {
   if (*row >= size) return 1.0;
@@ -533,9 +531,8 @@ double pair_data_ei_get_alpha(pair_pot_type *pair_pot) {
 }
 
 
-
-
 void pair_data_eidip_init(pair_pot_type *pair_pot, double *charges, double *dipoles, double alpha) {
+>>>>>>> Setup new PairPot class that can handle point dipoles
   pair_data_eidip_type *pair_data;
   pair_data = malloc(sizeof(pair_data_eidip_type));
   (*pair_pot).pair_data = pair_data;
