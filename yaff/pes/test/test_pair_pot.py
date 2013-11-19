@@ -679,6 +679,7 @@ def test_pair_pot_eidip_water():
     #Check energy from Yaff with manually computed energy
     check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, 1.0e-12)
     check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist, symm_vtens=False)
 
 
 #
