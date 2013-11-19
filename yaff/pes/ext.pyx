@@ -1953,7 +1953,6 @@ cdef class PairPotChargeTransferSlater1s1s(PairPot):
     width_power = property(_get_width_power)
 
 
-
 #
 # Ewald summation stuff
 #
