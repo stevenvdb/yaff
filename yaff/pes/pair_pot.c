@@ -127,7 +127,7 @@ double pair_pot_compute(neigh_row_type *neighs,
           // If a truncation scheme is defined, apply it.
           if (((*pair_pot).trunc_scheme!=NULL) && ((v!=0.0) || (vg!=0.0))) {
             // hg is (a pointer to) the derivative of the truncation function.
-            h = (*(*pair_pot).trunc_scheme).trunc_fn(neighs[i].d, (*pair_pot).rcut, (*(*pair_pot).trunc_scheme).par, &hg);
+            h = (*(*pair_pot).trunc_scheme).trunc_fn(neighs[i].d,    (*pair_pot).rcut, (*(*pair_pot).trunc_scheme).par, &hg);
             // chain rule:
             vg = vg*h + v*hg/neighs[i].d;
             vg_cart[0] = vg_cart[0]*h;
@@ -532,7 +532,6 @@ double pair_data_ei_get_alpha(pair_pot_type *pair_pot) {
 
 
 void pair_data_eidip_init(pair_pot_type *pair_pot, double *charges, double *dipoles, double alpha) {
->>>>>>> Setup new PairPot class that can handle point dipoles
   pair_data_eidip_type *pair_data;
   pair_data = malloc(sizeof(pair_data_eidip_type));
   (*pair_pot).pair_data = pair_data;
@@ -550,7 +549,6 @@ double pair_fn_eidip(void *pair_data, long center_index, long other_index, doubl
   double x, d_2, alpha, fac0, fac1, fac2, fac3;
   double mui_dot_delta, muj_dot_delta, mui_dot_muj;
   fac3 = 0.0;
-
   //Charges
   qi = (*(pair_data_eidip_type*)pair_data).charges[center_index];
   qj = (*(pair_data_eidip_type*)pair_data).charges[other_index];

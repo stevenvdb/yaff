@@ -493,7 +493,6 @@ def make_system_finite_dipoles(system, dipoles, eps=0.05*angstrom):
 
 
 
-=======
 def test_pair_pot_eidip_water_setdipoles():
     '''Test if we can modify dipoles of PairPotEIDip object'''
     #Setup simple system
@@ -519,6 +518,13 @@ def test_pair_pot_eidip_water_setdipoles():
         pair_pot.dipoles = dipoles2
     with assert_raises(AssertionError):
         pair_pot.dipoles = dipoles3
+
+def test_pair_pot_eidip_water():
+    #Setup system and force part
+    system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip()
+    #Check energy from Yaff with manually computed energy
+    check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, 1.0e-12)
+
 
 #
 # Caffeine tests
