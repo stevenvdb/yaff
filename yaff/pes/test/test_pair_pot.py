@@ -426,6 +426,8 @@ def check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, 
             if d < nlist.rcut:
                 energy = fac*pair_fn(a, b, d, delta)
                 check_energy += energy
+    #Add dipole creation energy
+    check_energy += 0.5*np.dot( np.transpose(np.reshape( pair_pot.dipoles, (-1,) )) , np.dot( pair_pot.poltens_i, np.reshape( pair_pot.dipoles, (-1,) ) ) )
     print "energy1 % 18.15f     check_energy % 18.15f     error % 18.15f" %(energy1, check_energy, energy1-check_energy)
     print "energy2 % 18.15f     check_energy % 18.15f     error % 18.15f" %(energy2, check_energy, energy2-check_energy)
     assert abs(energy1 - check_energy) < eps
@@ -503,8 +505,10 @@ def test_pair_pot_eidip_water_setdipoles():
     dipoles1 = np.array( [[9.0,8.0,7.0],[6.0,5.0,4.0],[3.0,2.0,1.0 ]] ) # natom x 3
     dipoles2 = np.array( [[9.0,8.0],[6.0,5.0],[3.0,2.0 ]] ) # natom x 2
     dipoles3 = np.array( [[9.0,8.0,7.0],[6.0,5.0,4.0]] ) # natom x 2
+    #Array representing atomic polarizability tensors
+    poltens_i = np.tile( np.diag([1.0,1.0,1.0]) , np.array([system.natom, 1]) )
     #Initialize pair potential
-    pair_pot = PairPotEIDip(system.charges,dipoles0,rcut)
+    pair_pot = PairPotEIDip(system.charges,dipoles0,poltens_i,rcut)
     #Check if dipoles are initialized correctly
     assert np.all( pair_pot.dipoles == dipoles0 )
     #Update the dipoles to new values
