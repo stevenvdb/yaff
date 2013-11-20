@@ -26,8 +26,6 @@
 import numpy as np
 
 from molmod import kcalmol, angstrom, rad, deg, femtosecond, boltzmann
-from molmod.periodic import periodic
-from molmod.io import XYZWriter
 
 from yaff.test.common import get_system_water_polarizable
 from yaff.sampling.polarization import Polarization_FSPM_ISD, construct_ei_tensor_monomono, \
@@ -35,6 +33,8 @@ from yaff.sampling.polarization import Polarization_FSPM_ISD, construct_ei_tenso
 from yaff.pes import *
 from yaff.sampling.iterative import Iterative
 
+from yaff.pes.test.test_pair_pot import get_part_water_eidip
+from yaff.sampling.polarization import *
 
 def get_part_water_eidip(scalings = [1.0,1.0,1.0],rcut=14.0*angstrom,switch_width=0.0*angstrom, alpha=0.0):
     # Initialize system, nlist and scaling
@@ -149,3 +149,34 @@ def test_ei_tensor_monodip():
     Tfv = construct_ei_tensor_monodip(iterative)
     E_tensor = 1.0*np.dot(np.dot(Qf.transpose(),Tfv),Qv)
     assert np.abs( Eqd - E_tensor ) < 1e-8
+
+
+def test_DipolSCPicard():
+    #This is not really a test yet, just check if everything runs
+    system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(scalings=[0.0,1.0,1.0])
+    ff = ForceField(system, [part_pair], nlist)
+    poltens = np.tile( np.diag([1,1,1]) , np.array([system.natom, 1]) )
+    opt = CGOptimizer(CartesianDOF(ff), hooks=RelaxDipoles(poltens))
+    opt.run(2)
+
+def test_polarization_get_ei_tensors():
+    """Check if the tensors from polarization module give correct energy"""
+    #Don't scale interactions, this is not implemented in determining the tensors
+    system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(scalings=[1.0,1.0,1.0])
+    poltens = np.tile( np.diag([1,1,1]) , np.array([system.natom, 1]) ) #This is not used for this test
+    #Get tensors from polarization module
+    G_0, G_1, G_2, D = get_ei_tensors( system.pos, poltens, system.natom)
+    #Reshape the dipole matrix to simplify matrix expressions
+    dipoles = np.reshape( pair_pot.dipoles , (-1,) )
+    #Compute energy using these tensors
+    #Charge-charge interaction
+    energy_tensor = 0.5*np.dot(np.transpose(system.charges), np.dot(G_0,system.charges) )
+    #Charge-dipole interaction
+    energy_tensor += np.dot( np.transpose( dipoles), np.dot( G_1, system.charges) )
+    #Dipole-dipole interaction
+    energy_tensor += 0.5*np.dot( np.transpose( dipoles), np.dot( G_2, dipoles) )
+    nlist.update() # update the neighborlists, once the rcuts are known.
+    # Compute the energy using yaff.
+    energy_yaff = part_pair.compute()
+    assert np.abs(energy_yaff-energy_tensor) < 1.0e-10
+>>>>>>> Tests for polarization
