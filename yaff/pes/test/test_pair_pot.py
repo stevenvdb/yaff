@@ -530,6 +530,17 @@ def test_pair_pot_eidip_water():
     check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, 1.0e-12)
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist, symm_vtens=False)
+    #Again, but with a truncation scheme (truncation scheme settings are ridiculous,
+    #but this is needed to see an effect for water)
+
+    #Setup system and force part
+    system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(rcut=2.0*angstrom,switch_width=1.5*angstrom)
+    #Check energy from Yaff with manually computed energy
+    check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, 1.0e-12)
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist, symm_vtens=False)
+
+
 
 
 #
