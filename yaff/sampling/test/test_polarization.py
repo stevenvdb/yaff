@@ -151,7 +151,16 @@ def test_ei_tensor_monodip():
     assert np.abs( Eqd - E_tensor ) < 1e-8
 
 
-def test_DipolSCPicard():
+def test_polarization_DipolSCPicard():
+    system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(scalings=[1.0,1.0,1.0])
+    poltens_i = np.diag([1.0]*3*system.natom) #This is not used for this test
+    dipoles = DipolSCPicard(system.pos, system.charges, poltens_i, system.natom, init=None, conv_crit=1e-10, tensors=None, system=system)
+    G_0, G_1, G_2, D, chi = get_ei_tensors( system.pos, poltens_i, system.natom, system)
+    lhs = np.dot( poltens_i + G_2,  np.reshape( dipoles , (-1) ) )
+    rhs = np.dot(-G_1, system.charges)
+    assert np.all( np.abs(lhs-rhs) < 1.0e-10 )
+
+def test_tmp():
     #This is not really a test yet, just check if everything runs
     system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(scalings=[0.0,1.0,1.0])
     ff = ForceField(system, [part_pair], nlist)
@@ -164,7 +173,7 @@ def test_polarization_get_ei_tensors():
     system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(scalings=[1.0,1.0,1.0])
     poltens_i = np.diag([1.0]*3*system.natom) #This is not used for this test
     #Get tensors from polarization module
-    G_0, G_1, G_2, D = get_ei_tensors( system.pos, poltens_i, system.natom)
+    G_0, G_1, G_2, D, chi = get_ei_tensors( system.pos, poltens_i, system.natom)
     #Reshape the dipole matrix to simplify matrix expressions
     dipoles = np.reshape( pair_pot.dipoles , (-1,) )
     #Compute energy using these tensors
