@@ -49,7 +49,7 @@ class System(object):
     def __init__(self, numbers, pos, scopes=None, scope_ids=None, ffatypes=None,
                  ffatype_ids=None, bonds=None, rvecs=None, charges=None,
                  slater1s_widths=None, slater1s_N=None, slater1s_Z=None,
-                 masses=None):
+                 masses=None, radii=None):
         '''
            **Arguments:**
 
@@ -108,6 +108,9 @@ class System(object):
                 An array of effective core charges. These core charges will be
                 treated together with the 1s Slater charge distributions in the
                 code.
+           radii
+                An array of atomic radii that determine shape of charge
+                distribution
 
            masses
                 The atomic masses (in atomic units, i.e. m_e)
@@ -140,6 +143,7 @@ class System(object):
         self.slater1s_widths = slater1s_widths
         self.slater1s_N = slater1s_N
         self.slater1s_Z = slater1s_Z
+        self.radii = radii
         self.masses = masses
         with log.section('SYS'):
             # report some stuff
@@ -419,7 +423,7 @@ class System(object):
                         'numbers', 'pos', 'scopes', 'scope_ids', 'ffatypes',
                         'ffatype_ids', 'bonds', 'rvecs', 'charges',
                         'slater1s_widths', 'slater1s_N', 'slater1s_Z', 'masses',
-                        'ffatype_ids', 'bonds', 'rvecs', 'charges', 'masses',
+                        'ffatype_ids', 'bonds', 'rvecs', 'charges', 'masses','radii',
                     ]
                     for key, value in load_chk(fn).iteritems():
                         if key in allowed_keys:
@@ -694,7 +698,7 @@ class System(object):
 
         # B) Simple repetitions
         rep_all = np.product(reps)
-        for attrname in 'numbers', 'ffatype_ids', 'scope_ids', 'charges', 'slater1s_widths', 'slater1s_N', 'slater1s_Z', 'masses':
+        for attrname in 'numbers', 'ffatype_ids', 'scope_ids', 'charges', 'slater1s_widths', 'slater1s_N', 'slater1s_Z', 'masses', 'radii':
             value = getattr(self, attrname)
             if value is not None:
                 new_args[attrname] = np.tile(value, rep_all)
@@ -832,6 +836,7 @@ class System(object):
         slater1s_widths = reduce_float_array(self.slater1s_widths)
         slater1s_N = reduce_float_array(self.slater1s_N)
         slater1s_Z = reduce_float_array(self.slater1s_Z)
+        radii = reduce_float_array(self.radii)
         masses = reduce_float_array(self.masses)
 
         # create averaged positions
@@ -902,6 +907,7 @@ class System(object):
             slater1s_widths=reduce_array(self.slater1s_widths),
             slater1s_N=reduce_array(self.slater1s_N),
             slater1s_Z=reduce_array(self.slater1s_Z),
+            radii=reduce_array(self.radii),
             masses=reduce_array(self.masses),
         )
 
@@ -959,6 +965,7 @@ class System(object):
                 'slater1s_widths': self.slater1s_widths,
                 'slater1s_N': self.slater1s_N,
                 'slater1s_Z': self.slater1s_Z,
+                'radii': self.radii,
                 'masses': self.masses,
             })
         elif fn.endswith('.h5'):
@@ -1006,5 +1013,7 @@ class System(object):
             sgrp.create_dataset('slater1s_N', data=self.slater1s_N)
         if self.slater1s_Z is not None:
             sgrp.create_dataset('slater1s_Z', data=self.slater1s_Z)
+        if self.radii is not None:
+            sgrp.create_dataset('radii', data=self.radii)
         if self.masses is not None:
             sgrp.create_dataset('masses', data=self.masses)
