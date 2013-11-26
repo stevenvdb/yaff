@@ -144,6 +144,7 @@ double pair_data_disp68bjdamp_get_bj_b(pair_pot_type *pair_pot);
 typedef struct {
   double *charges;
   double alpha;
+  double *radii;
 } pair_data_ei_type;
 
 void pair_data_ei_init(pair_pot_type *pair_pot, double *charges, double alpha);
