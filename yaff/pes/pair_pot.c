@@ -663,7 +663,6 @@ double pair_fn_ei(void *pair_data, long center_index, long other_index, double d
       pot = qprod*erfc(x)/d;
       if (g != NULL) *g = (-M_TWO_DIV_SQRT_PI*alpha*exp(-x*x)*qprod - pot)/(d*d);
       if (gg != NULL) *gg = (pot+M_TWO_DIV_SQRT_PI*alpha*(1.0+x*x)*exp(-x*x)*qprod)*2.0/(d*d*d*d);
-    }
   }
   //Original only
   else {
