@@ -526,7 +526,7 @@ double pair_fn_ei(void *pair_data, long center_index, long other_index, double d
     if (r_ab > 0 ){ //Original as Gaussian charge distributions
       x = alpha*d;
       y = d/r_ab;
-      pot = qprod/d*(erf(y) - erf(x) );
+      pot = qprod/d*(erfc(x) - erfc(y) );
       if (g != NULL) *g = ( M_TWO_DIV_SQRT_PI*(exp(-y*y)/r_ab - exp(-x*x)*alpha)*qprod - pot)/(d*d);
     }
     else{ //Original as point monopoles
@@ -857,4 +857,9 @@ double pair_data_chargetransferslater1s1s_get_ct_scale(pair_pot_type *pair_pot) 
 
 double pair_data_chargetransferslater1s1s_get_width_power(pair_pot_type *pair_pot) {
   return (*(pair_data_chargetransferslater1s1s_type*)((*pair_pot).pair_data)).width_power;
+}
+
+
+double pair_data_eidip_get_alpha(pair_pot_type *pair_pot) {
+  return (*(pair_data_eidip_type*)((*pair_pot).pair_data)).alpha;
 }

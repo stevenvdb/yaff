@@ -280,7 +280,7 @@ def get_part_water32_14A_ei(radii=None):
     pair_pot = PairPotEI(system.charges, alpha, rcut, radii=radii)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # The pair function
-    def pair_fn(i, j, d):
+    def pair_fn(i, j, d, delta):
         r_ij = np.sqrt( pair_pot.radii[i]**2 + pair_pot.radii[j]**2 )
         if r_ij == 0.0: pot = 1.0
         else: pot = erf(d/r_ij)
@@ -332,6 +332,43 @@ def test_pair_pot_eidip_water32_14A():
 def test_pair_pot_ei_water32_14A_gaussiancharges():
     radii = np.array( [1.50, 1.20, 1.20]*32 ) * angstrom
     system, nlist, scalings, part_pair, pair_fn = get_part_water32_14A_ei(radii=radii)
+    check_pair_pot_water32(system, nlist, scalings, part_pair, pair_fn, 1e-12, rmax=1)
+
+
+def get_part_water32_14A_eidip():
+    # Initialize system, nlist and scaling
+    system = get_system_water32()
+    #Reset charges
+    system.charges *= 0.0
+    #Set dipoles to random values
+    dipoles = np.random.rand( system.natom, 3 )
+    #Set polarizations to infinity (no energy to create dipoles)
+    poltens_i = np.tile( np.diag([0.0,0.0,0.0]) , np.array([system.natom, 1]) )
+    nlist = NeighborList(system)
+
+    scalings = Scalings(system, 1.0, 1.0, 1.0)
+    # Create the pair_pot and part_pair
+    rcut = 14*angstrom
+    alpha = 5.5/rcut
+    pair_pot = PairPotEIDip(system.charges, dipoles, poltens_i, alpha, rcut)
+    part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
+    part_pair.nlist.update()
+    print part_pair.nlist.neighs
+    # The pair function
+    def pair_fn(i, j, d, delta):
+        energy = 0.0
+        #Dipole-Dipole (only term for this test)
+        fac1 = erfc(alpha*d) + 2.0*alpha*d/np.sqrt(np.pi)*np.exp(-alpha**2*d**2)
+        fac2 = 3.0*erfc(alpha*d) + 4.0*alpha**2*d**3/np.sqrt(np.pi)*np.exp(-alpha**2*d**2) \
+                + 6.0*alpha*d/np.sqrt(np.pi)*np.exp(-alpha**2*d**2)
+        energy += np.dot( pair_pot.dipoles[i,:] , pair_pot.dipoles[j,:] )*fac1/d**3 - \
+                         1.0*np.dot(pair_pot.dipoles[i,:],delta)*np.dot(delta,pair_pot.dipoles[j,:])*fac2/d**5
+        return energy
+    return system, nlist, scalings, part_pair, pair_fn
+
+
+def test_pair_pot_eidip_water32_14A():
+    system, nlist, scalings, part_pair, pair_fn = get_part_water32_14A_eidip()
     check_pair_pot_water32(system, nlist, scalings, part_pair, pair_fn, 1e-12, rmax=1)
 
 
@@ -517,7 +554,7 @@ def test_pair_pot_eidip_water_setdipoles():
     #Array representing atomic polarizability tensors
     poltens_i = np.tile( np.diag([1.0,1.0,1.0]) , np.array([system.natom, 1]) )
     #Initialize pair potential
-    pair_pot = PairPotEIDip(system.charges,dipoles0,poltens_i,rcut)
+    pair_pot = PairPotEIDip(system.charges,dipoles0,poltens_i,0.0,rcut)
     #Check if dipoles are initialized correctly
     assert np.all( pair_pot.dipoles == dipoles0 )
     #Update the dipoles to new values
