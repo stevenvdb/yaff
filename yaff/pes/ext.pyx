@@ -57,6 +57,7 @@ __all__ = [
     'dlist_back', 'iclist_forward', 'iclist_back', 'iclist_jacobian', 'iclist_hessian',
     'vlist_forward', 'vlist_back', 'vlist_hessian', 'compute_grid3d',
     'SwitchErrorFunction'
+
 ]
 
 
@@ -2429,6 +2430,93 @@ def compute_ewald_reci_dd(np.ndarray[double, ndim=2] pos,
                                     my_vtens)
 
 
+def compute_ewald_reci_dd(np.ndarray[double, ndim=2] pos,
+                       np.ndarray[double, ndim=2] dipoles,
+                       Cell unitcell, double alpha,
+                       np.ndarray[long, ndim=1] jmax, double kcut,
+                       np.ndarray[double, ndim=2] gpos,
+                       np.ndarray[double, ndim=1] work,
+                       np.ndarray[double, ndim=2] vtens):
+    '''Compute the reciprocal interaction term in the Ewald summation scheme
+
+       **Arguments:**
+
+       pos
+            The atomic positions. numpy array with shape (natom,3).
+
+       dipoles
+            The atomic dipoles. numpy array with shape (natom,3).
+
+       unitcell
+            An instance of the ``Cell`` class that describes the periodic
+            boundary conditions.
+
+       alpha
+            The :math:`\\alpha` parameter from the Ewald summation scheme.
+
+       jmax
+            The maximum range of periodic images in reciprocal space to be
+            considered for the Ewald sum. integer numpy array with shape (3,).
+            Each element gives the range along the corresponding reciprocal
+            cell vector. The range along each axis goes from -jmax[0] to
+            jmax[0] (inclusive).
+
+       kcut
+            The cutoff in reciprocal space. The caller is responsible for the
+            compatibility of ``kcut`` with ``jmax``.
+
+       gpos
+            If not set to None, the Cartesian gradient of the energy is
+            stored in this array. numpy array with shape (natom, 3).
+
+       work
+            If gpos is given, this work array must also be present. Its
+            contents will be overwritten. numpy array with shape (2*natom,).
+
+       vtens
+            If not set to None, the virial tensor is computed and stored in
+            this array. numpy array with shape (3, 3).
+    '''
+    cdef double *my_gpos
+    cdef double *my_work
+    cdef double *my_vtens
+
+    assert pos.flags['C_CONTIGUOUS']
+    assert pos.shape[1] == 3
+    assert dipoles.flags['C_CONTIGUOUS']
+    assert dipoles.shape[0] == pos.shape[0]
+    assert unitcell.nvec == 3
+    assert alpha > 0
+    assert jmax.flags['C_CONTIGUOUS']
+    assert jmax.shape[0] == 3
+
+    if gpos is None:
+        my_gpos = NULL
+        my_work = NULL
+    else:
+        assert gpos.flags['C_CONTIGUOUS']
+        assert gpos.shape[1] == 3
+        assert gpos.shape[0] == pos.shape[0]
+        assert work.flags['C_CONTIGUOUS']
+        assert gpos.shape[0]*2 == work.shape[0]
+        my_gpos = <double*>gpos.data
+        my_work = <double*>work.data
+
+    if vtens is None:
+        my_vtens = NULL
+    else:
+        assert vtens.flags['C_CONTIGUOUS']
+        assert vtens.shape[0] == 3
+        assert vtens.shape[1] == 3
+        my_vtens = <double*>vtens.data
+
+    return ewald.compute_ewald_reci_dd(<double*>pos.data, len(pos),
+                                    <double*>dipoles.data,
+                                    unitcell._c_cell, alpha,
+                                    <long*>jmax.data, kcut, my_gpos, my_work,
+                                    my_vtens)
+
+
 def compute_ewald_corr(np.ndarray[double, ndim=2] pos,
                        np.ndarray[double, ndim=1] charges,
                        Cell unitcell, double alpha,
@@ -2659,6 +2747,78 @@ def compute_ewald_corr_dd(np.ndarray[double, ndim=2] pos,
 
     return ewald.compute_ewald_corr_dd(
         <double*>pos.data, <double*>charges.data, <double*>dipoles.data, unitcell._c_cell, alpha,
+        <pair_pot.scaling_row_type*>stab.data, len(stab), my_gpos,
+        my_vtens, len(pos)
+    )
+
+def compute_ewald_corr_dd(np.ndarray[double, ndim=2] pos,
+                       np.ndarray[double, ndim=2] dipoles,
+                       Cell unitcell, double alpha,
+                       np.ndarray[pair_pot.scaling_row_type, ndim=1] stab,
+                       np.ndarray[double, ndim=2] gpos,
+                       np.ndarray[double, ndim=2] vtens):
+    '''Compute the corrections to the reciprocal Ewald term due to scaled
+       short-range non-bonding interactions.
+
+       **Arguments:**
+
+       pos
+            The atomic positions. numpy array with shape (natom,3).
+
+       charges
+            The atomic charges. numpy array with shape (natom,).
+
+       unitcell
+            An instance of the ``Cell`` class that describes the periodic
+            boundary conditions.
+
+       alpha
+            The :math:`\\alpha` parameter from the Ewald summation scheme.
+
+       stab
+            The table with (sorted) pairs of atoms whose electrostatic
+            interactions are scaled. Each record corresponds to one pair
+            and contains the corresponding amount of scaling. See
+            ``pair_pot.scaling_row_type``
+
+       gpos
+            If not set to None, the Cartesian gradient of the energy is
+            stored in this array. numpy array with shape (natom, 3).
+
+       vtens
+            If not set to None, the virial tensor is computed and stored in
+            this array. numpy array with shape (3, 3).
+    '''
+
+    cdef double *my_gpos
+    cdef double *my_vtens
+
+    assert pos.flags['C_CONTIGUOUS']
+    assert pos.shape[1] == 3
+    assert dipoles.flags['C_CONTIGUOUS']
+    assert dipoles.shape[0] == pos.shape[0]
+    assert dipoles.shape[1] == pos.shape[1]
+    assert alpha > 0
+    assert stab.flags['C_CONTIGUOUS']
+
+    if gpos is None:
+        my_gpos = NULL
+    else:
+        assert gpos.flags['C_CONTIGUOUS']
+        assert gpos.shape[1] == 3
+        assert gpos.shape[0] == pos.shape[0]
+        my_gpos = <double*>gpos.data
+
+    if vtens is None:
+        my_vtens = NULL
+    else:
+        assert vtens.flags['C_CONTIGUOUS']
+        assert vtens.shape[0] == 3
+        assert vtens.shape[1] == 3
+        my_vtens = <double*>vtens.data
+
+    return ewald.compute_ewald_corr_dd(
+        <double*>pos.data, <double*>dipoles.data, unitcell._c_cell, alpha,
         <pair_pot.scaling_row_type*>stab.data, len(stab), my_gpos,
         my_vtens, len(pos)
     )

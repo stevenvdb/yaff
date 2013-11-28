@@ -672,7 +672,6 @@ def test_pair_pot_ei_water32_dielectric():
     assert np.all(np.abs(vtens0-vtens1) < 1.0e-10 )
 
 
-
 def test_pair_pot_eidip_water():
     #Setup system and force part
     system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip()

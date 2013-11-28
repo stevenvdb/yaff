@@ -470,6 +470,64 @@ class ForcePartEwaldReciprocalDD(ForcePart):
             )
 
 
+class ForcePartEwaldReciprocalDD(ForcePart):
+    '''The long-range contribution to the dipole-dipole
+       electrostatic interaction in 3D periodic systems.
+    '''
+    def __init__(self, system, alpha, gcut=0.35):
+        '''
+           **Arguments:**
+
+           system
+                The system to which this interaction applies.
+
+           alpha
+                The alpha parameter in the Ewald summation method.
+
+           gcut
+                The cutoff in reciprocal space.
+        '''
+        ForcePart.__init__(self, 'ewald_reci', system)
+        if not system.cell.nvec == 3:
+            raise TypeError('The system must have a 3D periodic cell.')
+        if system.charges is None:
+            raise ValueError('The system does not have charges.')
+        if system.dipoles is None:
+            raise ValueError('The system does not have dipoles.')
+        self.system = system
+        self.alpha = alpha
+        self.gcut = gcut
+        self.update_gmax()
+        self.work = np.empty(system.natom*2)
+        if log.do_medium:
+            with log.section('FPINIT'):
+                log('Force part: %s' % self.name)
+                log.hline()
+                log('  alpha:             %s' % log.invlength(self.alpha))
+                log('  gcut:              %s' % log.invlength(self.gcut))
+                log.hline()
+
+
+    def update_gmax(self):
+        '''This routine must be called after the attribute self.gmax is modified.'''
+        self.gmax = np.ceil(self.gcut/self.system.cell.gspacings-0.5).astype(int)
+        if log.do_debug:
+            with log.section('EWALD'):
+                log('gmax a,b,c   = %i,%i,%i' % tuple(self.gmax))
+
+    def update_rvecs(self, rvecs):
+        '''See :meth:`yaff.pes.ff.ForcePart.update_rvecs`'''
+        ForcePart.update_rvecs(self, rvecs)
+        self.update_gmax()
+
+    def _internal_compute(self, gpos, vtens):
+        with timer.section('Ewald reci.'):
+            return compute_ewald_reci_dd(
+                self.system.pos, self.system.dipoles, self.system.cell, self.alpha,
+                self.gmax, self.gcut, gpos, self.work, vtens
+            )
+
+
 class ForcePartEwaldCorrection(ForcePart):
     '''Correction for the double counting in the long-range term of the Ewald sum.
 

@@ -214,6 +214,7 @@ def get_electrostatic_energy_dd(alpha, system):
     gpos = np.zeros(system.pos.shape, float)
     vtens = np.zeros((3, 3), float)
     energy = ff.compute(gpos, vtens)
+    print gpos
     print '    # %4.2f' % alpha, ' '.join('%15.7e' % part.energy for part in ff.parts)
     return energy, gpos, vtens
 
