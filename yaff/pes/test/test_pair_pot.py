@@ -690,7 +690,48 @@ def test_pair_pot_eidip_water():
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist, symm_vtens=False)
 
-
+def make_system_finite_dipoles(system, dipoles, eps=0.05*angstrom):
+    '''
+    Make a system where point dipoles are replaced by finite dipoles consisting
+    of two charges separated by eps with charges +|d|/eps and -|d|/eps.
+    Special attention has to be paid to the nlist, as we do not want to include
+    interactions between charges around the same atom.
+    '''
+    ncharges = 3 #Original charge + two charges to approximate dipole
+    newsystem = {}
+    #Copy some 'easy' attributes of the orginal system
+    #No repetitions
+    newsystem['ffatypes'] = system.ffatypes
+    newsystem['bonds'] = system.bonds #No new connections are introduced
+    #Three repetitions
+    newsystem['numbers'] = np.tile( system.numbers, ncharges)
+    newsystem['radii'] = np.tile( system.radii, ncharges)
+    newsystem['masses'] = np.tile( system.masses, ncharges)
+    newsystem['ffatype_ids'] = np.tile( system.ffatype_ids, ncharges)
+    #Cell vectors
+    newsystem['rvecs'] = system.cell.rvecs
+    #Charges
+    d_norms = np.sqrt( np.sum( dipoles**2 , axis = 1 ) )
+    ac = np.zeros( system.natom*ncharges )
+    ac[0*system.natom:1*system.natom] = system.charges
+    ac[1*system.natom:2*system.natom] = d_norms/eps*0.5
+    ac[2*system.natom:3*system.natom] = -d_norms/eps*0.5
+    newsystem['charges'] = ac
+    #Positions
+    pos = np.zeros( (system.natom*ncharges,3 ))
+    pos[0*system.natom:1*system.natom,:] = system.pos
+    pos[1*system.natom:2*system.natom,:] = system.pos - eps*dipoles/np.transpose(np.reshape( np.tile(d_norms,3), (3,-1) ))
+    pos[2*system.natom:3*system.natom,:] = system.pos + eps*dipoles/np.transpose(np.reshape( np.tile(d_norms,3), (3,-1) ))
+    return System(
+        numbers=newsystem['numbers'],
+        pos=pos,
+        ffatypes=newsystem['ffatypes'],
+        ffatype_ids=newsystem['ffatype_ids'],
+        bonds=newsystem['bonds'],
+        rvecs=newsystem['rvecs'],
+        charges=newsystem['charges'],
+        radii=newsystem['radii'],
+        masses=newsystem['masses'] )
 
 
 #
