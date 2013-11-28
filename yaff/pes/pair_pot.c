@@ -675,6 +675,7 @@ void pair_data_eislater1sp1spcorr_init(pair_pot_type *pair_pot, double *slater1s
   }
 }
 
+
 double pair_fn_eislater1sp1spcorr(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *g_cart) {
   long i,j;
   double a,Na,Za,b,Nb,Zb;

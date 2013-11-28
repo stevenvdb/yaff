@@ -170,12 +170,17 @@ double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *d
           }
         }
         c = fac1*exp(-ksq*fac2)/ksq;
-        s = (cosfac*cosfac+sinfac*sinfac);
+        s = ( (k[0]*cosfac[0]+k[1]*cosfac[1]+k[2]*cosfac[2]) * (k[0]*cosfac[0]+k[1]*cosfac[1]+k[2]*cosfac[2])
+             +(k[0]*sinfac[0]+k[1]*sinfac[1]+k[2]*sinfac[2]) * (k[0]*sinfac[0]+k[1]*sinfac[1]+k[2]*sinfac[2]) );
         energy += c*s;
         if (gpos != NULL) {
           x = 2.0*c;
-          cosfac *= x;
-          sinfac *= x;
+          cosfac[0] *= x;
+          cosfac[1] *= x;
+          cosfac[2] *= x;
+          sinfac[0] *= x;
+          sinfac[1] *= x;
+          sinfac[2] *= x;
           for (i=0; i<natom; i++) {
             x = cosfac*work[2*i+1] + sinfac*work[2*i];
             gpos[3*i+0] += k[0]*x;
@@ -184,6 +189,7 @@ double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *d
           }
         }
         if (vtens != NULL) {
+          //TODO: Term still missing here
           c *= 2.0*(1.0/ksq+fac2)*s;
           vtens[0] += c*k[0]*k[0] + cosfac_dd[0]*k[0]*cosfac + sinfac_dd[0]*k[0]*sinfac;
           vtens[4] += c*k[1]*k[1] + cosfac_dd[1]*k[1]*cosfac + sinfac_dd[1]*k[1]*sinfac;
