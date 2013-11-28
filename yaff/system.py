@@ -121,6 +121,9 @@ class System(object):
                 distribution
                 rho[i]=-(dipoles[i] dot r-pos[i])*2.0/(sqrt(pi)radii2[i]**5)*exp(-(|r-pos[i]|/radii[i])**2)
 
+           dipoles
+                An array of atomic dipoles
+
            masses
                 The atomic masses (in atomic units, i.e. m_e)
 
