@@ -28,7 +28,6 @@
 #include "ewald.h"
 #include "cell.h"
 
-
 double compute_ewald_reci(double *pos, long natom, double *charges,
                           cell_type* cell, double alpha, long *gmax,
                           double gcut, double *gpos, double *work,
