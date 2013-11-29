@@ -2431,6 +2431,7 @@ def compute_ewald_reci_dd(np.ndarray[double, ndim=2] pos,
 
 
 def compute_ewald_reci_dd(np.ndarray[double, ndim=2] pos,
+                       np.ndarray[double, ndim=1] charges,
                        np.ndarray[double, ndim=2] dipoles,
                        Cell unitcell, double alpha,
                        np.ndarray[long, ndim=1] jmax, double kcut,
@@ -2443,6 +2444,9 @@ def compute_ewald_reci_dd(np.ndarray[double, ndim=2] pos,
 
        pos
             The atomic positions. numpy array with shape (natom,3).
+
+       charges
+            The atomic charges. numpy array with shape (natom,).
 
        dipoles
             The atomic dipoles. numpy array with shape (natom,3).
@@ -2483,6 +2487,8 @@ def compute_ewald_reci_dd(np.ndarray[double, ndim=2] pos,
 
     assert pos.flags['C_CONTIGUOUS']
     assert pos.shape[1] == 3
+    assert charges.flags['C_CONTIGUOUS']
+    assert charges.shape[0] == pos.shape[0]
     assert dipoles.flags['C_CONTIGUOUS']
     assert dipoles.shape[0] == pos.shape[0]
     assert unitcell.nvec == 3
@@ -2511,6 +2517,7 @@ def compute_ewald_reci_dd(np.ndarray[double, ndim=2] pos,
         my_vtens = <double*>vtens.data
 
     return ewald.compute_ewald_reci_dd(<double*>pos.data, len(pos),
+                                    <double*>charges.data,
                                     <double*>dipoles.data,
                                     unitcell._c_cell, alpha,
                                     <long*>jmax.data, kcut, my_gpos, my_work,
@@ -2752,6 +2759,7 @@ def compute_ewald_corr_dd(np.ndarray[double, ndim=2] pos,
     )
 
 def compute_ewald_corr_dd(np.ndarray[double, ndim=2] pos,
+                       np.ndarray[double, ndim=1] charges,
                        np.ndarray[double, ndim=2] dipoles,
                        Cell unitcell, double alpha,
                        np.ndarray[pair_pot.scaling_row_type, ndim=1] stab,
@@ -2818,7 +2826,7 @@ def compute_ewald_corr_dd(np.ndarray[double, ndim=2] pos,
         my_vtens = <double*>vtens.data
 
     return ewald.compute_ewald_corr_dd(
-        <double*>pos.data, <double*>dipoles.data, unitcell._c_cell, alpha,
+        <double*>pos.data, <double*>charges.data, <double*>dipoles.data, unitcell._c_cell, alpha,
         <pair_pot.scaling_row_type*>stab.data, len(stab), my_gpos,
         my_vtens, len(pos)
     )

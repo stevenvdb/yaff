@@ -717,6 +717,7 @@ def make_system_finite_dipoles(system, dipoles, eps=0.05*angstrom):
     ac[2*system.natom:3*system.natom] = -d_norms/eps*0.5
     newsystem['charges'] = ac
     #Positions
+    d_norms[d_norms==0.0] = 1.0
     pos = np.zeros( (system.natom*ncharges,3 ))
     pos[0*system.natom:1*system.natom,:] = system.pos
     pos[1*system.natom:2*system.natom,:] = system.pos - eps*dipoles/np.transpose(np.reshape( np.tile(d_norms,3), (3,-1) ))

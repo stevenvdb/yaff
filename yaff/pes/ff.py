@@ -523,7 +523,7 @@ class ForcePartEwaldReciprocalDD(ForcePart):
     def _internal_compute(self, gpos, vtens):
         with timer.section('Ewald reci.'):
             return compute_ewald_reci_dd(
-                self.system.pos, self.system.dipoles, self.system.cell, self.alpha,
+                self.system.pos, self.system.charges, self.system.dipoles, self.system.cell, self.alpha,
                 self.gmax, self.gcut, gpos, self.work, vtens
             )
 
