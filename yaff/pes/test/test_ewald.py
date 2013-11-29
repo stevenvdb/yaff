@@ -187,6 +187,7 @@ def check_alpha_dependence_dd(system):
     energies = np.array(energies)
     gposs = np.array(gposs)
     vtenss = np.array(vtenss)
+    print vtenss
     print energies
     assert abs(energies - energies.mean()).max() < 1e-8
     assert abs(gposs - gposs.mean(axis=0)).max() < 1e-8
@@ -214,7 +215,6 @@ def get_electrostatic_energy_dd(alpha, system):
     gpos = np.zeros(system.pos.shape, float)
     vtens = np.zeros((3, 3), float)
     energy = ff.compute(gpos, vtens)
-    print gpos
     print '    # %4.2f' % alpha, ' '.join('%15.7e' % part.energy for part in ff.parts)
     return energy, gpos, vtens
 
