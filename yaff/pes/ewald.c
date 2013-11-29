@@ -27,6 +27,7 @@
 #include "constants.h"
 #include "ewald.h"
 #include "cell.h"
+#include <stdio.h>
 
 double compute_ewald_reci(double *pos, long natom, double *charges,
                           cell_type* cell, double alpha, long *gmax,
@@ -124,6 +125,9 @@ double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *d
   for (i=0; i<9; i++) {
     kvecs[i] = M_TWO_PI*(*cell).gvecs[i];
   }
+  tmp0 = 0.0;
+  tmp1 = 0.0;
+  tmp2 = 0.0;
   energy = 0.0;
   fac1 = M_FOUR_PI/(*cell).volume;
   fac2 = 0.25/alpha/alpha;
@@ -169,17 +173,17 @@ double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *d
           }
         }
         c = fac1*exp(-ksq*fac2)/ksq;
-        s = ( (k[0]*cosfac[0]+k[1]*cosfac[1]+k[2]*cosfac[2]) * (k[0]*cosfac[0]+k[1]*cosfac[1]+k[2]*cosfac[2])
-             +(k[0]*sinfac[0]+k[1]*sinfac[1]+k[2]*sinfac[2]) * (k[0]*sinfac[0]+k[1]*sinfac[1]+k[2]*sinfac[2]) );
-        energy += c*s;
+        s = ( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2])
+             +(k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) );
+        energy_cd += c*s;
         if (gpos != NULL) {
           x = 2.0*c;
-          cosfac[0] *= x;
-          cosfac[1] *= x;
-          cosfac[2] *= x;
-          sinfac[0] *= x;
-          sinfac[1] *= x;
-          sinfac[2] *= x;
+          cosfac_dd[0] *= x;
+          cosfac_dd[1] *= x;
+          cosfac_dd[2] *= x;
+          sinfac_dd[0] *= x;
+          sinfac_dd[1] *= x;
+          sinfac_dd[2] *= x;
           for (i=0; i<natom; i++) {
             x = cosfac*work[2*i+1] + sinfac*work[2*i];
             gpos[3*i+0] += k[0]*x;
@@ -206,6 +210,97 @@ double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *d
       }
     }
   }
+  //DC interactions
+  energy_dc = 0.0;
+
+
+  //DD interactions
+  energy_dd = 0.0;
+  fac1 = M_FOUR_PI/(*cell).volume;
+  fac2 = 0.25/alpha/alpha;
+  gcut *= M_TWO_PI;
+  gcut *= gcut;
+  for (g0=-gmax[0]; g0 <= gmax[0]; g0++) {
+    for (g1=-gmax[1]; g1 <= gmax[1]; g1++) {
+      for (g2=0; g2 <= gmax[2]; g2++) {
+        if (g2==0) {
+          if (g1<0) continue;
+          if ((g1==0)&&(g0<=0)) continue;
+        }
+        k[0] = (g0*kvecs[0] + g1*kvecs[3] + g2*kvecs[6]);
+        k[1] = (g0*kvecs[1] + g1*kvecs[4] + g2*kvecs[7]);
+        k[2] = (g0*kvecs[2] + g1*kvecs[5] + g2*kvecs[8]);
+        ksq = k[0]*k[0] + k[1]*k[1] + k[2]*k[2];
+        if (ksq > gcut) continue;
+        cosfac_dd[0] = 0.0;
+        cosfac_dd[1] = 0.0;
+        cosfac_dd[2] = 0.0;
+        sinfac_dd[0] = 0.0;
+        sinfac_dd[1] = 0.0;
+        sinfac_dd[2] = 0.0;
+        for (i=0; i<natom; i++) {
+          x = k[0]*pos[3*i] + k[1]*pos[3*i+1] + k[2]*pos[3*i+2];
+          c = cos(x);
+          s = sin(x);
+          cosfac_dd[0] += dipoles[3*i+0]*c;
+          cosfac_dd[1] += dipoles[3*i+1]*c;
+          cosfac_dd[2] += dipoles[3*i+2]*c;
+          sinfac_dd[0] += dipoles[3*i+0]*s;
+          sinfac_dd[1] += dipoles[3*i+1]*s;
+          sinfac_dd[2] += dipoles[3*i+2]*s;
+          if (gpos != NULL) {
+            work[2*i+0] = k[0]*dipoles[3*i+0]*c + k[1]*dipoles[3*i+1]*c + k[2]*dipoles[3*i+2]*c;
+            work[2*i+1] = -k[0]*dipoles[3*i+0]*s- k[1]*dipoles[3*i+1]*s - k[2]*dipoles[3*i+2]*s;
+          }
+        }
+        c = fac1*exp(-ksq*fac2)/ksq;
+        s = ( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2])
+             +(k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) );
+        energy_dd += c*s;
+        if (gpos != NULL) {
+          x = 2.0*c;
+          cosfac_dd[0] *= x;
+          cosfac_dd[1] *= x;
+          cosfac_dd[2] *= x;
+          sinfac_dd[0] *= x;
+          sinfac_dd[1] *= x;
+          sinfac_dd[2] *= x;
+          for (i=0; i<natom; i++) {
+            x = (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2])*work[2*i+1] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2])*work[2*i];
+            gpos[3*i+0] += k[0]*x;
+            gpos[3*i+1] += k[1]*x;
+            gpos[3*i+2] += k[2]*x;
+          }
+        }
+        if (vtens != NULL) {
+          c2 = c*2.0*(1.0/ksq+fac2)*s;
+          vtens[0] += c2*k[0]*k[0] - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[0] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[0])*k[0]/c;
+          vtens[4] += c2*k[1]*k[1] - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[1] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[1])*k[1]/c;
+          vtens[8] += c2*k[2]*k[2] - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[2] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[2])*k[2]/c;
+          x = c2*k[1]*k[0];
+          vtens[1] += x - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[0] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[0])*k[1]/c;
+          vtens[3] += x - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[1] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[1])*k[0]/c;
+          x = c2*k[2]*k[0];
+          vtens[2] += x - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[0] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[0])*k[2]/c;
+          vtens[6] += x - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[2] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[2])*k[0]/c;
+          x = c2*k[2]*k[1];
+          vtens[5] += x - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[1] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[1])*k[2]/c;
+          vtens[7] += x -  0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[2] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[2])*k[1]/c;
+        }
+      }
+    }
+  }
+
+
+
+
+
+
+
+
+
+  energy = energy_cc + energy_cd + energy_dc + energy_dd;
+  */
   if (vtens != NULL) {
     vtens[0] -= energy;
     vtens[4] -= energy;

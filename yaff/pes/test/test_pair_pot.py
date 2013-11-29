@@ -371,7 +371,7 @@ def test_pair_pot_eidip_water32_14A():
     check_pair_pot_water32(system, nlist, scalings, part_pair, pair_fn, 1e-12, rmax=1)
 
 
-def get_part_water_eidip(scalings = [0.5,1.0,1.0],rcut=14.0*angstrom,switch_width=0.0*angstrom, finite=False):
+def get_part_water_eidip(scalings = [0.5,1.0,1.0],rcut=14.0*angstrom,switch_width=0.0*angstrom, finite=False, alpha=0.0):
     '''
     Make a system with one water molecule with a point dipole on every atom,
     setup a ForcePart...
@@ -607,6 +607,7 @@ def make_system_finite_dipoles(system, dipoles, eps=0.05*angstrom):
     ac[2*system.natom:3*system.natom] = -d_norms/eps*0.5
     newsystem['charges'] = ac
     #Positions
+    d_norms[d_norms==0.0] = 1.0
     pos = np.zeros( (system.natom*ncharges,3 ))
     pos[0*system.natom:1*system.natom,:] = system.pos
     pos[1*system.natom:2*system.natom,:] = system.pos - eps*dipoles/np.transpose(np.reshape( np.tile(d_norms,3), (3,-1) ))
