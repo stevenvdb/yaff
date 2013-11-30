@@ -704,7 +704,11 @@ def make_system_finite_dipoles(system, dipoles, eps=0.05*angstrom):
     newsystem['bonds'] = system.bonds #No new connections are introduced
     #Three repetitions
     newsystem['numbers'] = np.tile( system.numbers, ncharges)
-    newsystem['radii'] = np.tile( system.radii, ncharges)
+    if system.radii is None and system.radii2 is None: newsystem['radii'] = None
+    else:
+        if system.radii is None: system.radii = np.zeros( (natom,1) )
+        if system.radii2 is None: system.radii2 = np.zeros( (natom,1) )
+    newsystem['radii'] = np.reshape( np.asarray([system.radii,system.radii2, system.radii2]), (-1,) )
     newsystem['masses'] = np.tile( system.masses, ncharges)
     newsystem['ffatype_ids'] = np.tile( system.ffatype_ids, ncharges)
     #Cell vectors

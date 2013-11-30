@@ -46,6 +46,7 @@ def _unravel_triangular(i):
 
 
 class System(object):
+    #TODO check attributes radii, dipoles and radii2
     def __init__(self, numbers, pos, scopes=None, scope_ids=None, ffatypes=None,
                  ffatype_ids=None, bonds=None, rvecs=None, charges=None,
                  slater1s_widths=None, slater1s_N=None, slater1s_Z=None,
@@ -123,6 +124,10 @@ class System(object):
 
            dipoles
                 An array of atomic dipoles
+
+           radii2
+                An array of atomic radii that determine shape of dipole
+                distribution
 
            masses
                 The atomic masses (in atomic units, i.e. m_e)
