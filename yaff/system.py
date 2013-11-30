@@ -46,10 +46,11 @@ def _unravel_triangular(i):
 
 
 class System(object):
+    #TODO check attributes radii, dipoles and radii2
     def __init__(self, numbers, pos, scopes=None, scope_ids=None, ffatypes=None,
                  ffatype_ids=None, bonds=None, rvecs=None, charges=None,
                  slater1s_widths=None, slater1s_N=None, slater1s_Z=None,
-                 masses=None, radii=None):
+                 masses=None, radii=None, radii2=None):
         '''
            **Arguments:**
 
@@ -115,6 +116,10 @@ class System(object):
            dipoles
                 An array of atomic dipoles
 
+           radii2
+                An array of atomic radii that determine shape of dipole
+                distribution
+
            masses
                 The atomic masses (in atomic units, i.e. m_e)
 
@@ -148,6 +153,7 @@ class System(object):
         self.slater1s_Z = slater1s_Z
         self.radii = radii
         self.dipoles = dipoles
+        self.radii2 = radii2
         self.masses = masses
         with log.section('SYS'):
             # report some stuff
@@ -702,7 +708,7 @@ class System(object):
 
         # B) Simple repetitions
         rep_all = np.product(reps)
-        for attrname in 'numbers', 'ffatype_ids', 'scope_ids', 'charges', 'slater1s_widths', 'slater1s_N', 'slater1s_Z', 'masses', 'radii':
+        for attrname in 'numbers', 'ffatype_ids', 'scope_ids', 'charges', 'slater1s_widths', 'slater1s_N', 'slater1s_Z', 'masses', 'radii', 'radii2':
             value = getattr(self, attrname)
             if value is not None:
                 new_args[attrname] = np.tile(value, rep_all)
@@ -845,8 +851,8 @@ class System(object):
         slater1s_N = reduce_float_array(self.slater1s_N)
         slater1s_Z = reduce_float_array(self.slater1s_Z)
         radii = reduce_float_array(self.radii)
-        print self.dipoles
         dipoles = reduce_float_array(self.dipoles)
+        radii2 = reduce_float_array(self.radii2)
         masses = reduce_float_array(self.masses)
 
         # create averaged positions
@@ -918,6 +924,7 @@ class System(object):
             slater1s_N=reduce_array(self.slater1s_N),
             slater1s_Z=reduce_array(self.slater1s_Z),
             radii=reduce_array(self.radii),
+            radii2=reduce_array(self.radii2),
             masses=reduce_array(self.masses),
         )
 
@@ -977,6 +984,7 @@ class System(object):
                 'slater1s_Z': self.slater1s_Z,
                 'radii': self.radii,
                 'dipoles': self.dipoles,
+                'radii2': self.radii2,
                 'masses': self.masses,
             })
         elif fn.endswith('.h5'):
