@@ -521,15 +521,15 @@ double pair_fn_ei(void *pair_data, long center_index, long other_index, double d
                (*(pair_data_ei_type*)pair_data).radii[other_index] * (*(pair_data_ei_type*)pair_data).radii[other_index] );
   alpha = (*(pair_data_ei_type*)pair_data).alpha;
 
-  //Original minus gaussian charge distribution
+  //Original minus gaussian screening charge distribution
   if (alpha > 0) {
-    if (r_ab > 0 ){ //Original as Gaussian charge distributions
+    if (r_ab > 0 ){ //Original is a Gaussian charge distribution
       x = alpha*d;
       y = d/r_ab;
       pot = qprod/d*(erfc(x) - erfc(y) );
       if (g != NULL) *g = ( M_TWO_DIV_SQRT_PI*(exp(-y*y)/r_ab - exp(-x*x)*alpha)*qprod - pot)/(d*d);
     }
-    else{ //Original as point monopoles
+    else{ //Original is a point monopole
       x = alpha*d;
       pot = qprod*erfc(x)/d;
       if (g != NULL) *g = (-M_TWO_DIV_SQRT_PI*alpha*exp(-x*x)*qprod - pot)/(d*d);
@@ -537,12 +537,12 @@ double pair_fn_ei(void *pair_data, long center_index, long other_index, double d
   }
   //Original only
   else {
-    if (r_ab > 0) {//Gaussian charge distributions
+    if (r_ab > 0) {//Original is a gaussian charge distribution
          y = d/r_ab;
          pot = qprod/d*erf(y);
          if (g != NULL) *g = (M_TWO_DIV_SQRT_PI/r_ab*exp(-y*y)*qprod-pot)/(d*d);
      }
-     else{ //Treat as point monopole
+     else{ //Original is a point monopole
          pot = qprod/d;
          if (g != NULL) *g = -pot/(d*d);
      }
@@ -553,7 +553,6 @@ double pair_fn_ei(void *pair_data, long center_index, long other_index, double d
 double pair_data_ei_get_alpha(pair_pot_type *pair_pot) {
   return (*(pair_data_ei_type*)((*pair_pot).pair_data)).alpha;
 }
-
 
 void pair_data_eidip_init(pair_pot_type *pair_pot, double *charges, double *dipoles, double alpha) {
   pair_data_eidip_type *pair_data;
@@ -859,7 +858,6 @@ double pair_data_chargetransferslater1s1s_get_ct_scale(pair_pot_type *pair_pot) 
 double pair_data_chargetransferslater1s1s_get_width_power(pair_pot_type *pair_pot) {
   return (*(pair_data_chargetransferslater1s1s_type*)((*pair_pot).pair_data)).width_power;
 }
-
 
 double pair_data_eidip_get_alpha(pair_pot_type *pair_pot) {
   return (*(pair_data_eidip_type*)((*pair_pot).pair_data)).alpha;

@@ -432,6 +432,7 @@ def get_part_water_eidip(scalings = [0.5,1.0,1.0],rcut=14.0*angstrom,switch_widt
 def test_pair_pot_eidip_water_finite():
     #Compare the electrostatic energy of a system with point dipoles with the
     #energy of a system with these dipoles approximated by two point charges
+    #TODO: what happens to the virial tensor in this case?
     for alpha in 0.0, 2.0:
         #Get the electrostatic energy of a water molecule with atomic point dipoles approximated by two charges
         system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(scalings=[1.0,1.0,1.0],finite=True,alpha=alpha)
