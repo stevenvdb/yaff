@@ -46,7 +46,6 @@ def _unravel_triangular(i):
 
 
 class System(object):
-    #TODO check attributes radii, dipoles and radii2
     def __init__(self, numbers, pos, scopes=None, scope_ids=None, ffatypes=None,
                  ffatype_ids=None, bonds=None, rvecs=None, charges=None,
                  slater1s_widths=None, slater1s_N=None, slater1s_Z=None,
@@ -128,6 +127,7 @@ class System(object):
            radii2
                 An array of atomic radii that determine shape of dipole
                 distribution
+                rho[i]=-(dipoles[i] dot r-pos[i])*2.0/(sqrt(pi)radii2[i]**5)*exp(-(|r-pos[i]|/radii[i])**2)
 
            masses
                 The atomic masses (in atomic units, i.e. m_e)
