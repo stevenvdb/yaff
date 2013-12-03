@@ -34,4 +34,3 @@ from yaff.sampling.utils import *
 from yaff.sampling.verlet import *
 from yaff.sampling.nvt import *
 from yaff.sampling.trajectory import *
-from yaff.sampling.polarization import *
