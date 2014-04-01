@@ -86,8 +86,8 @@ type of plot is essential for checking the sanity of a simulation.
     pt.ylabel('Energy [%s]' % log.energy.notation)
     pt.legend(loc=0)
     pt.savefig(fn_png)
-    
-    
+
+
 def plot_energies2(f, fn_png='energies.png', **kwargs):
     """Make a plot of the potential, total and conserved energy as f. of time
 

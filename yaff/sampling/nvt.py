@@ -163,7 +163,7 @@ class NHChain(object):
             barostat.propagate_press(self.vel[0], self.ndof, ekin, vel, masses, volume, iterative)
         # iL xi (all) h/2
         self.pos += self.vel*self.timestep/2
-        
+
         if barostat is not None:
             # iL (vg + Tr(vg)/ndof + vxi_1) h/2 if barostat is present
             vel, ekin = barostat.propagate_vel(self.vel[0], self.ndof, vel, masses)
@@ -217,7 +217,7 @@ class NHCThermostat(VerletHook):
 
            chainlength
                 The number of beads in the Nose-Hoover chain.
-           
+
            barostat
                 A MartynaTobiasKleinBarostat instance.
         """

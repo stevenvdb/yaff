@@ -211,9 +211,9 @@ class Spectrum(AnalysisHook):
     def plot(self, fn_png='spectrum.png', do_wavenum=True, xlim=None, verticals=None, thermostat=None, ndof=None):
         """
             verticals: array containing as first entry the timeconstant of the original
-            system, and as following entries the wavenumbers of the original system. 
+            system, and as following entries the wavenumbers of the original system.
         """
-        
+
         import matplotlib.pyplot as pt
         if do_wavenum:
             xunit = lightspeed/centimeter
@@ -222,9 +222,9 @@ class Spectrum(AnalysisHook):
             xunit = 1/log.time.conversion
             xlabel = 'Frequency [1/%s]' % log.time.notation
         pt.clf()
-        pt.plot(self.freqs/xunit, self.amps)     
+        pt.plot(self.freqs/xunit, self.amps)
         if verticals is not None:
-            thermo_freq = 1.0/verticals[0]/lightspeed*centimeter        
+            thermo_freq = 1.0/verticals[0]/lightspeed*centimeter
             #plot frequencies original system, and coupling to thermostat
             for i in np.arange(1, len(verticals)):
                 pt.axvline(verticals[i], color='r', ls='--')
@@ -236,14 +236,14 @@ class Spectrum(AnalysisHook):
             pt.axvline(thermo_freq/np.sqrt(ndof), color='k', ls='--')
             pt.axvline(thermo_freq+thermo_freq/np.sqrt(ndof), color='r', ls='--')
             pt.axvline(thermo_freq+2.0*thermo_freq/np.sqrt(ndof), color='r', ls='--')
-        
+
         if xlim is not None:
             pt.xlim(xlim[0]/xunit, xlim[1]/xunit)
         else:
             pt.xlim(0, self.freqs[-1]/xunit)
-        
-            
-            
+
+
+
         pt.xlabel(xlabel)
         pt.ylabel('Amplitude')
         pt.savefig(fn_png)

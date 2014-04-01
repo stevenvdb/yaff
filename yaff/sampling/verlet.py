@@ -206,7 +206,7 @@ class VerletIntegrator(Iterative):
                     for i in np.arange(0,3):
                         arg = Dr[i][i]*self.timestep/2
                         Dv[i][i] = np.exp(arg)*(1+arg**2/fact(3)+arg**4/fact(5)+arg**6/fact(7)+arg**8/fact(9)+arg**10/fact(11)+arg**12/fact(13)+arg**14/fact(15)) # Mclaurin series of sinh
-                    pos_old = self.pos    
+                    pos_old = self.pos
                     for i in np.arange(0,len(self.pos)):
                         self.pos[i] = np.dot(Qg, (np.dot(Dracc, np.dot(Qg.T, self.pos[i])) + self.timestep*np.dot(Dv, np.dot(Qg.T, self.vel[i]))))
                     self.ff.update_pos(self.pos)
@@ -220,7 +220,7 @@ class VerletIntegrator(Iterative):
                     self.epot = self.ff.compute(self.gpos, self.vtens)
                     self.acc = -self.gpos/self.masses.reshape(-1,1)
                     self.vel += 0.5*self.acc*self.timestep
-            
+
 
         # Allow specialized verlet hooks to modify the state after the step
         self.call_verlet_hooks('post')

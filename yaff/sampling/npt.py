@@ -122,19 +122,19 @@ class AndersenMcDonaldBarostat(VerletHook):
                         ))
                     log('THERMO energy change %s' % log.energy(ekin0 - ekin1))
 
-                  
+
 class MartynaTobiasKleinBarostat(VerletHook):
     def __init__(self, ff, temp, press, start=0, timecon=1000*femtosecond):
         """
-            This hook implements the combination of the Nosé-Hoover chain thermostat 
+            This hook implements the combination of the Nosé-Hoover chain thermostat
             and the Martyna-Tobias-Klein barostat. The equations are derived in:
-                            
+
                 Martyna, G. J.; Tobias, D. J.: Klein, M. L. J. Chem. Phys. 1994,
-                101, 4177-4189.   
-                
+                101, 4177-4189.
+
             The implementation (used here) of a symplectic integrator of this thermostat
             and barostat is discussed in
-            
+
                 Martyna, G. J.;  Tuckerman, M. E.;  Tobias, D. J.;  Klein,
                 M. L. Mol. Phys. 1996, 87, 1117-1157.
 
@@ -142,10 +142,10 @@ class MartynaTobiasKleinBarostat(VerletHook):
 
             ff
                 A ForceField instance.
-                
+
             temp
                 The temperature of thermostat.
-           
+
             press
                 The applied pressure for the barostat.
 
@@ -156,16 +156,16 @@ class MartynaTobiasKleinBarostat(VerletHook):
 
             timecon
                 The time constant of the Martyna-Tobias-Klein barostat.
-        """    
+        """
         self.temp = temp
         self.press = press
         self.timecon_press = timecon
         self.cell = ff.system.cell.rvecs.copy()
         self.dim = ff.system.cell.nvec
-        
+
         # symmetrize the cell tensor
         self.cell_symmetrize(ff)
-        
+
         # allocate degrees of freedom
         angfreq = 2*np.pi/self.timecon_press
         self.mass_press = boltzmann*self.temp/angfreq**2
@@ -182,7 +182,7 @@ class MartynaTobiasKleinBarostat(VerletHook):
         for i in np.arange(0,len(pos_old)):
             pos_new[i] = np.dot(rot_mat,pos_old[i])
         ff.update_pos(pos_new)
-        
+
     def get_random_vel_press(self):
         # generates symmetric tensor of barostat velocities
         shape = 3, 3
@@ -197,20 +197,20 @@ class MartynaTobiasKleinBarostat(VerletHook):
                 else:
                     vel_press[i,j] = rand[j,i]
         return vel_press
-    
+
     def init(self, iterative):
         self.timestep_press = iterative.timestep
-        
+
     def pre(self, iterative):
         pass
-            
+
     def post(self, iterative):
         pass
-        
+
     def propagate_press(self, chain_vel, ndof, ekin, vel, masses, volume, iterative):
         # iL vxi_1 h/8
         self.vel_press *= np.exp(-chain_vel*self.timestep_press/8)
-        
+
         # necessary to calculate it here again, instead of during Verlet step?
         vtens = np.zeros((3,3),float)
         iterative.ff.compute(None,vtens)
@@ -221,7 +221,7 @@ class MartynaTobiasKleinBarostat(VerletHook):
         self.vel_press += G*self.timestep_press/4
         # iL vxi_1 h/8
         self.vel_press *= np.exp(-chain_vel*self.timestep_press/8)
-            
+
     def propagate_vel(self, chain_vel, ndof, vel, masses):
         # diagonalize propagator matrix
         Dg, Eg = np.linalg.eig(self.vel_press+(np.trace(self.vel_press)/ndof+chain_vel)*np.eye(3))
@@ -239,8 +239,8 @@ class MartynaTobiasKleinBarostat(VerletHook):
     def add_press_cont(self):
         # pressure contribution to g1: kinetic cell tensor energy
         # and extra degrees of freedom due to cell tensor
-        return self.mass_press*np.trace(np.dot(self.vel_press.T,self.vel_press)) - self.dim**2*self.temp*boltzmann     
-                
+        return self.mass_press*np.trace(np.dot(self.vel_press.T,self.vel_press)) - self.dim**2*self.temp*boltzmann
+
     def get_econs_correction(self, chain_vel, iterative):
         kt = boltzmann*self.temp
         # add correction due to combination barostat and thermostat
