@@ -130,16 +130,16 @@ class NHChain(object):
         shape = self.length
         return np.random.normal(0, np.sqrt(self.masses*boltzmann*self.temp), shape)/self.masses
 
-    def __call__(self, ekin, vel, G1_add):
+    def __call__(self, ekin, vel, barostat, volume, masses, iterative):
         def do_bead(k, ekin):
             # Compute g
             if k == 0:
                 # coupling with atoms (and barostat)
                 # L = ndof (+d^2) because of equidistant time steps.
                 g = 2*ekin - self.ndof*self.temp*boltzmann
-                if G1_add is not None:
+                if barostat is not None:
                     # add pressure contribution to g1
-                    g += G1_add
+                    g += barostat.add_press_cont()
             else:
                 # coupling between beads
                 g = self.masses[k-1]*self.vel[k-1]**2 - self.temp*boltzmann
@@ -161,16 +161,22 @@ class NHChain(object):
         for k in xrange(self.length-1, -1, -1):
             do_bead(k, ekin)
 
-
         # iL (G_g - vxi_1 vg) h/4 if barostat is present
-        if self.barostat is not None:
-            self.barostat.propagate_press(self.vel[0], self.ndof, ekin, vel, masses, volume, iterative)
+        if barostat is not None:
+            barostat.propagate_press(self.vel[0], self.ndof, ekin, vel, masses, volume, iterative)
         # iL xi (all) h/2
         self.pos += self.vel*self.timestep/2
-        # iL Cv (all) h/2
-        factor = np.exp(-self.vel[0]*self.timestep/2)
-        vel *= factor
-        ekin *= factor**2
+
+        if barostat is not None:
+            # iL (vg + Tr(vg)/ndof + vxi_1) h/2 if barostat is present
+            vel, ekin = barostat.propagate_vel(self.vel[0], self.ndof, vel, masses)
+            # iL (G_g - vxi_1 vg) h/4 if barostat is present
+            barostat.propagate_press(self.vel[0], self.ndof, ekin, vel, masses, volume, iterative)
+        else:
+            # iL Cv (all) h/2
+            factor = np.exp(-self.vel[0]*self.timestep/2)
+            vel *= factor
+            ekin *= factor**2
 
         # Loop over chain in forward order
         for k in xrange(0, self.length):
@@ -214,6 +220,9 @@ class NHCThermostat(VerletHook):
 
            chainlength
                 The number of beads in the Nose-Hoover chain.
+
+           barostat
+                A MartynaTobiasKleinBarostat instance.
         """
         self.temp = temp
         # At this point, the timestep and the number of degrees of freedom are
@@ -232,17 +241,16 @@ class NHCThermostat(VerletHook):
         self.chain.timestep = iterative.timestep
         self.chain.set_ndof(iterative.ndof)
 
-    def pre(self, iterative, G1_add = None):
-        vel_new, iterative.ekin = self.chain(iterative.ekin, iterative.vel, G1_add)
-        iterative.vel[:] = vel_new
+    def pre(self, iterative):
+        iterative.ekin = self.chain(iterative.ekin, iterative.vel, self.barostat, iterative.ff.system.cell.volume, iterative.masses, iterative)
 
     def post(self, iterative, G1_add = None):
         ekin = iterative._compute_ekin()
-        vel_new, iterative.ekin = self.chain(ekin, iterative.vel, G1_add)
-        iterative.vel[:] = vel_new
+        iterative.ekin = self.chain(ekin, iterative.vel, self.barostat, iterative.ff.system.cell.volume, iterative.masses, iterative)
         self.econs_correction = self.chain.get_econs_correction()
         if self.barostat is not None:
-            self.econs_correction += self.barostat.get_econs_correction(self.chain.pos[0], iterative.ff.system.cell.volume)
+            self.econs_correction += self.barostat.get_econs_correction(self.chain.pos[0], iterative)
+
 
 class LangevinThermostat(VerletHook):
     def __init__(self, temp, start=0, timecon=100*femtosecond):

@@ -198,7 +198,7 @@ def plot_pressure(f, fn_png='pressure.png', window = 1, **kwargs):
         press_av[i] = press[i:i+window].sum()/window
         time_av[i] = time[i]
     pt.clf()
-    pt.plot(time_av, press_av/(1e9*pascal), 'k-',label='Sim (%.3f MPa)' % (press.mean()/(1e6*pascal)))
+    pt.plot(time, press/(1e9*pascal), 'k-',label='Sim (%.3f MPa)' % (press.mean()/(1e6*pascal)))
     pt.xlim(time[0], time[-1])
     pt.xlabel(tlabel)
     pt.ylabel('pressure [GPA]')
