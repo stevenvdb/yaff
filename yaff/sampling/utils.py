@@ -277,7 +277,7 @@ def get_ndof_internal_md(natom, nper):
             return 3*natom - 6
     elif nper == 1:
         # 1D periodic: three translations and one rotation about the cell vector.
-        return 3*natom - 4
+        return 3*natom - 4      
     else:
         # 2D and 3D periodic
         return 3*natom - 3
