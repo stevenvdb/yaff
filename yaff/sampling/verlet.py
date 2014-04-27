@@ -218,7 +218,7 @@ class VerletIntegrator(Iterative):
                     self.ff.update_rvecs(self.rvecs)
                     #for i in np.arange(0, len(self.pos)):
                     #    self.pos[i] = np.dot(self.rvecs, np.dot(np.linalg.inv(rvecs_old), self.pos[i]))
-                    self.ff.update_pos(self.pos)
+                    #self.ff.update_pos(self.pos)
                     self.compute_properties()
                     self.gpos[:] = 0.0
                     self.vtens[:] = 0.0

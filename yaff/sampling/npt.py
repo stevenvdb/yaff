@@ -278,15 +278,21 @@ class MartynaTobiasKleinBarostat(VerletHook):
         self.vel_press = self.get_random_vel_press()
 
     def cell_symmetrize(self, ff):
+        pos_old = ff.system.pos.copy()
+        # frac_pos_old = np.zeros((len(pos_old),3), float)
+        # frac_pos_new = np.zeros((len(pos_old),3), float)
+        # for i in np.arange(0,len(pos_old)):
+        #    frac_pos_old[i] = np.dot(np.linalg.inv(self.cell), pos_old[i])
         U, s, V = np.linalg.svd(self.cell)
         rot_mat = np.dot(V.T, U.T)
         self.cell = np.dot(rot_mat,self.cell)
         ff.update_rvecs(self.cell)
-        pos_old = ff.system.pos.copy()
         pos_new = pos_old
         for i in np.arange(0,len(pos_old)):
             pos_new[i] = np.dot(rot_mat,pos_old[i])
+        #    frac_pos_new[i] = np.dot(np.linalg.inv(self.cell), pos_new[i])
         ff.update_pos(pos_new)
+        # print frac_pos_old - frac_pos_new
 
     def get_random_vel_press(self):
         # generates symmetric tensor of barostat velocities
@@ -339,8 +345,8 @@ class MartynaTobiasKleinBarostat(VerletHook):
         #print 'ndof = ' + str(ndof)
         #print 'PextV = ' + str((self.press*volume)/kjmol)
         #print '2K/3N = ' + str((2.0*ekin/ndof)/kjmol)
-        #print 'vol = ' + str(volume)
-        G = (ptens_vol-(self.press*volume)*np.eye(3))/self.mass_press
+        # print 'vol = ' + str(volume)
+        # G = (ptens_vol-(self.press*volume)*np.eye(3))/self.mass_press
         # iL G_g h/4
         self.vel_press += G*self.timestep_press/4
         # iL vxi_1 h/8
@@ -351,11 +357,6 @@ class MartynaTobiasKleinBarostat(VerletHook):
         #print self.vel_press+(np.trace(self.vel_press)/ndof+chain_vel)*np.eye(3)
         Dg, Eg = np.linalg.eigh(self.vel_press+(np.trace(self.vel_press)/ndof+chain_vel)*np.eye(3))
         #Dg, Eg = np.linalg.eig(self.vel_press+(chain_vel)*np.eye(3))
-        if np.imag(Dg).any() > 0 or np.imag(Eg).any() > 0:
-            L = self.vel_press+(np.trace(self.vel_press)/ndof+chain_vel)*np.eye(3)
-            print 'Symmetrisch? ' + str(L-L.T)
-            print 'Dg = ' + str(Dg)
-            print 'Eg = ' + str(Eg)
         # define D_g and D'_g
         Daccg = np.exp(-Dg*self.timestep_press/2)
         Daccg = np.diagflat(Daccg)
