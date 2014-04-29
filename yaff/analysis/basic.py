@@ -375,7 +375,7 @@ def plot_press_dist(f, temp, fn_png='press_dist.png', press=None, ndof=None, sel
 
        f
             An h5.File instance containing the trajectory data.
-       
+
        temp
             The (expected) average temperature used to plot the theoretical
             distributions.
@@ -427,15 +427,15 @@ def plot_press_dist(f, temp, fn_png='press_dist.png', press=None, ndof=None, sel
              temp = ((f['trajectory/vel'][i,select]**2).mean(axis=1)*weights).mean()
              temps.append(temp)
         temps = np.array(temps)
-        
+
     if temp is None:
         temp = temps.mean()
 
     presss = f['trajectory/press'][start:end:step]
     if press is None:
         press = presss.mean()
-        
-    # A) SYSTEM  
+
+    # A) SYSTEM
     if select is None:
         natom = f['system/numbers'].shape[0]
     else:
@@ -490,8 +490,8 @@ def plot_press_dist(f, temp, fn_png='press_dist.png', press=None, ndof=None, sel
     pt.xlabel('Pressure [MPa]')
 
     pt.savefig(fn_png)
-    
-    
+
+
 
 def plot_volume_dist(f, fn_png='volume_dist.png', temp=None, press=None, **kwargs):
     """Plots the distribution of the volume
@@ -500,7 +500,7 @@ def plot_volume_dist(f, fn_png='volume_dist.png', temp=None, press=None, **kwarg
 
         f
             An h5.File instance containing the trajectory data.
-       
+
 
         **Optional arguments:**
 
@@ -510,7 +510,7 @@ def plot_volume_dist(f, fn_png='volume_dist.png', temp=None, press=None, **kwarg
         temp
             The (expected) average temperature used to plot the theoretical
             distributions.
-            
+
         press
             The (expected) average pressure used to plot the theoretical
             distributions.
@@ -529,21 +529,21 @@ def plot_volume_dist(f, fn_png='volume_dist.png', temp=None, press=None, **kwarg
     from scipy.stats import chi2
     start, end, step = get_slice(f, **kwargs)
 
-      
+
     if temp is None:
         # Make an array of the temperature
         temps = f['trajectory/temp'][start:end:step]
         temp = temps.mean()
-        
-    if press is None:    
+
+    if press is None:
         # Make an array of the pressure
         presss = f['trajectory/press'][start:end:step]
         press = presss.mean()
-        
+
     # Make an array of the cell volume
     vols = f['trajectory/volume'][start:end:step]
-    vol0 = vols.mean()    
-        
+    vol0 = vols.mean()
+
     sigma = np.std(vols)
     vol_step = sigma/5
 
@@ -590,7 +590,7 @@ def plot_volume_dist(f, fn_png='volume_dist.png', temp=None, press=None, **kwarg
     pt.xlabel('Volume [A^3]')
 
     pt.savefig(fn_png)
-    
+
 def plot_density(f, fn_png='density.png', **kwargs):
     """Make a plot of the mass density as function of time
 
