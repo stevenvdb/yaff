@@ -2019,6 +2019,84 @@ cdef class PairPotChargeTransferSlater1s1s(PairPot):
 
     alpha = property(_get_alpha)
 
+cdef class PairPotEiSlater1s1sCorr(PairPot):
+    r'''Electrostatic interaction between sites with a point core charge and a
+        1s Slater charge density MINUS the electrostatic interaction between
+        the resulting net point charges.
+        TODO: explain this properly
+
+        **Arguments:**
+
+        slater1s_widths
+            An array of Slater widths, shape = (natom,)
+
+        slater1s_N
+            An array of Slater populations, shape = (natom,)
+
+        slater1s_Z
+            An array of effective core charges, shape = (natom,)
+
+        rcut
+            The cutoff radius
+
+        **Optional arguments:**
+
+        tr
+            The truncation scheme, an instance of a subclass of ``Truncation``.
+            When not given, no truncation is applied
+    '''
+    cdef np.ndarray _c_slater1s_widths
+    cdef np.ndarray _c_slater1s_N
+    cdef np.ndarray _c_slater1s_Z
+    name = 'eislater1s1scorr'
+
+    def __cinit__(self, np.ndarray[double, ndim=1] slater1s_widths,
+                  np.ndarray[double, ndim=1] slater1s_N, np.ndarray[double, ndim=1] slater1s_Z,
+                  double rcut, Truncation tr=None):
+        assert slater1s_widths.flags['C_CONTIGUOUS']
+        assert slater1s_N.flags['C_CONTIGUOUS']
+        assert slater1s_Z.flags['C_CONTIGUOUS']
+        # Precompute some factors here???
+        pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
+        self.set_truncation(tr)
+        pair_pot.pair_data_eislater1s1scorr_init(self._c_pair_pot, <double*>slater1s_widths.data,  <double*>slater1s_N.data,  <double*>slater1s_Z.data)
+        if not pair_pot.pair_pot_ready(self._c_pair_pot):
+            raise MemoryError()
+        self._c_slater1s_widths = slater1s_widths
+        self._c_slater1s_N = slater1s_N
+        self._c_slater1s_Z = slater1s_Z
+
+    def log(self):
+        '''Print suitable initialization info on screen.'''
+        if log.do_medium:
+            log.hline()
+            #log('  alpha:             %s' % log.invlength(self.alpha))
+        if log.do_high:
+            log.hline()
+            #log('   Atom     Charge')
+            #log.hline()
+            #for i in xrange(self._c_charges.shape[0]):
+            #    log('%7i %s' % (i, log.charge(self._c_charges[i])))
+
+    def _get_slater1s_widths(self):
+        '''The atomic charges'''
+        return self._c_slater1s_widths.view()
+
+    slater1s_widths = property(_get_slater1s_widths)
+
+    def _get_slater1s_N(self):
+        '''The atomic charges'''
+        return self._c_slater1s_N.view()
+
+    slater1s_N = property(_get_slater1s_N)
+
+    def _get_slater1s_Z(self):
+        '''The atomic charges'''
+        return self._c_slater1s_Z.view()
+
+    slater1s_Z = property(_get_slater1s_Z)
+
+
 
 #
 # Ewald summation stuff

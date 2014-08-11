@@ -1189,6 +1189,7 @@ def check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn
     # Compute the energy manually
     check_energy = 0.0
     srow = 0
+    core_charges = system.charges - system.valence_charges
     for a in xrange(system.natom):
         # compute the distances in the neighborlist manually and check.
         for b in xrange(a):
@@ -1314,6 +1315,13 @@ def test_gpos_vtens_pair_pot_caffeine_ei2_10A():
     system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_ei3_10A()
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
+
+
+def test_gpos_vtens_pot_4113_01WaterWater_eislater1s1scorr():
+    system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_eislater1s1scorr()
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
+
 
 
 #

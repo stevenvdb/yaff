@@ -37,7 +37,6 @@ __all__ = [
     'get_system_2T', 'get_system_peroxide', 'get_system_mil53',
     'get_system_2atoms', 'get_2systems_2oxygens', 'get_system_formaldehyde',
     'get_system_amoniak', 'get_system_4113_01WaterWater',
-    'get_system_2atoms', 'get_2systems_2oxygens',
 ]
 
 
@@ -516,10 +515,14 @@ def get_system_4113_01WaterWater():
        [ 2.593135384, -0.449496183, -0.744782026],
     ])*angstrom
     bonds = np.array([[0,1],[0,2],[3,4],[3,5]])
-    slater_widths = np.array([0.41319930026598994,0.3627838006301428,0.36506437561248933,0.41325284559113074,0.3630690392361035,0.3630602780887136])
-    slater_N = np.array([-7.1864406538427446,-0.5757853693582672,-0.5779228946118505,-7.189537747105163,-0.575295591836335,-0.5752744321374641])
+    slater_widths = np.array([0.41319930026598994, 0.3627838006301428,
+                              0.36506437561248933, 0.41325284559113074,
+                              0.3630690392361035, 0.3630602780887136])
+    slater_charges = np.array([-7.1864406538427446, -0.5757853693582672,
+                               -0.5779228946118505, -7.189537747105163,
+                               -0.575295591836335, -0.5752744321374641])
     slater_Z = np.array([6.340131543436602,1.0,1.0,6.34008454441325,1.0,1.0])
-    charges = slater_Z + slater_N
-    ffatypes = ['at%03d'%i for i in xrange(len(numbers))]
-    system = System(numbers,pos,bonds=bonds,ffatypes=ffatypes,charges=charges,slater1s_widths=slater_widths,slater1s_N=slater_N,slater1s_Z=slater_Z)
+    charges = slater_Z + slater_charges
+    system = System(numbers, pos, bonds=bonds, charges=charges,
+                    radii=slater_widths, valence_charges=slater_charges)
     return system
