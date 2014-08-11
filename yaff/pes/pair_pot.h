@@ -129,4 +129,20 @@ void pair_data_eislater1s1scorr_init(pair_pot_type *pair_pot, double *slater1s_w
 double pair_fn_eislater1s1scorr(void *pair_data, long center_index, long other_index, double d, double *g);
 
 
+typedef struct {
+  double *N;
+  double *widths;
+  double ex_scale;
+  double corr_a;
+  double corr_b;
+  double corr_c;
+} pair_data_olpslater1s1s_type;
+
+void pair_data_olpslater1s1s_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double ex_scale, double corr_a, double corr_b, double corr_c);
+double pair_fn_olpslater1s1s(void *pair_data, long center_index, long other_index, double d, double *g);
+double pair_data_olpslater1s1s_get_ex_scale(pair_pot_type *pair_pot);
+double pair_data_olpslater1s1s_get_corr_a(pair_pot_type *pair_pot);
+double pair_data_olpslater1s1s_get_corr_b(pair_pot_type *pair_pot);
+double pair_data_olpslater1s1s_get_corr_c(pair_pot_type *pair_pot);
+
 #endif

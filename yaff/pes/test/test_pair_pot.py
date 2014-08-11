@@ -632,7 +632,39 @@ def get_part_4113_01WaterWater_eislater1s1scorr():
     return system, nlist, scalings, part_pair, pair_fn
 
 
-def check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, eps):
+def get_part_4113_01WaterWater_olpslater1s1s():
+    # Get a system and define scalings
+    system = get_system_4113_01WaterWater()
+    #system = system.subsystem([2,3])
+    #print system.slater1s_widths
+    nlist = NeighborList(system)
+    scalings = Scalings(system, 0.0, 1.0, 1.0)
+    rcut = 20*angstrom
+    # Define some parameters for the exchange term
+    ex_scale = 1.0
+    corr_a = 16.0
+    corr_b = 2.4
+    corr_c = -0.2
+    # Make the pair potential
+    pair_pot = PairPotOlpSlater1s1s(system.slater1s_widths, system.slater1s_N, ex_scale, rcut, corr_a=corr_a, corr_b=corr_b, corr_c=corr_c)
+    part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
+    def pair_fn(i, j, R, alpha, beta):
+        E = 0.0
+        delta = beta-alpha
+        if np.abs(delta)<0.025:
+            alphaR = R/alpha
+            T0 = (alphaR**2+3.0*alphaR+3.0)*np.exp(-alphaR)/192.0/np.pi/alpha**3
+            T1 = (alphaR**3-2.0*alphaR**2-9.0*alphaR-9.0)*np.exp(-alphaR)/384.0/np.pi/alpha**4
+            T2 = (3.0*alphaR**4-25.0*alphaR**3+5.0*alphaR**2+90.0*alphaR+90.0)*np.exp(-alphaR)/1920.0/np.pi/alpha**5
+            E = T0 + T1*delta + 0.5*T2*delta**2
+        else:
+            E = (alpha*np.exp(-R/alpha) + beta*np.exp(-R/beta))/8.0/np.pi/(alpha-beta)**2/(alpha+beta)**2
+            E += alpha**2*beta**2*(np.exp(-R/beta) - np.exp(-R/alpha))/2.0/np.pi/R/(alpha-beta)**3/(alpha+beta)**3
+        return E*ex_scale*(1.0+corr_c*(system.slater1s_N[i]+system.slater1s_N[j]))*(1.0-np.exp(corr_a-corr_b*R/np.sqrt(alpha*beta)))
+    return system, nlist, scalings, part_pair, pair_fn
+
+
+def check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, eps, do_cores=False):
     nlist.update() # update the neighborlists, once the rcuts are known.
     # Compute the energy using yaff.
     energy1 = part_pair.compute()
@@ -653,9 +685,10 @@ def check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn
             d = np.linalg.norm(delta)
             if d < nlist.rcut:
                 energy  = fac*pair_fn(a, b, d, system.slater1s_widths[a], system.slater1s_widths[b])*system.slater1s_N[a]*system.slater1s_N[b]
-                energy += fac*pair_fn(a, b, d, 0.0, system.slater1s_widths[b])*system.slater1s_Z[a]*system.slater1s_N[b]
-                energy += fac*pair_fn(a, b, d, system.slater1s_widths[a], 0.0)*system.slater1s_N[a]*system.slater1s_Z[b]
-                energy += fac*pair_fn(a, b, d, 0.0, 0.0)*system.slater1s_Z[a]*system.slater1s_Z[b]
+                if do_cores:
+                    energy += fac*pair_fn(a, b, d, 0.0, system.slater1s_widths[b])*system.slater1s_Z[a]*system.slater1s_N[b]
+                    energy += fac*pair_fn(a, b, d, system.slater1s_widths[a], 0.0)*system.slater1s_N[a]*system.slater1s_Z[b]
+                    energy += fac*pair_fn(a, b, d, 0.0, 0.0)*system.slater1s_Z[a]*system.slater1s_Z[b]
                 check_energy += energy
     print "energy1 % 18.15f     check_energy % 18.15f     error % 18.15f" %(energy1, check_energy, energy1-check_energy)
     print "energy2 % 18.15f     check_energy % 18.15f     error % 18.15f" %(energy2, check_energy, energy2-check_energy)
@@ -665,6 +698,11 @@ def check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn
 
 def test_pair_pot_4113_01WaterWater_eislater1s1scorr():
     system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_eislater1s1scorr()
+    check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, 1e-8, do_cores=True)
+
+
+def test_pair_pot_4113_01WaterWater_olpslater1s1s():
+    system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_olpslater1s1s()
     check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, 1e-8)
 
 
@@ -742,6 +780,11 @@ def test_gpos_vtens_pot_4113_01WaterWater_eislater1s1scorr():
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
 
+
+def test_gpos_vtens_pot_4113_01WaterWater_olpslater1s1s():
+    system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_olpslater1s1s()
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
 
 
 #
