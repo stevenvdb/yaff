@@ -57,7 +57,6 @@ __all__ = [
     'dlist_back', 'iclist_forward', 'iclist_back', 'iclist_jacobian', 'iclist_hessian',
     'vlist_forward', 'vlist_back', 'vlist_hessian', 'compute_grid3d',
     'SwitchErrorFunction'
-
 ]
 
 
