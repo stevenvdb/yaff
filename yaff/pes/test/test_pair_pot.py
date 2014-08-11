@@ -36,6 +36,7 @@ from yaff.pes.test.common import check_gpos_part, check_vtens_part
     get_system_2atoms, get_system_quartz, get_system_water
 from yaff.pes.test.common import check_gpos_part, check_vtens_part, check_hess_part
 
+
 from yaff import *
 
 
