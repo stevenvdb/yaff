@@ -48,6 +48,7 @@ def _unravel_triangular(i):
 class System(object):
     def __init__(self, numbers, pos, scopes=None, scope_ids=None, ffatypes=None,
                  ffatype_ids=None, bonds=None, rvecs=None, charges=None,
+                 slater1s_widths=None, slater1s_N=None, slater1s_Z=None,
                  masses=None):
         '''
            **Arguments:**
@@ -95,6 +96,19 @@ class System(object):
            charges
                 An array of atomic charges
 
+           slater1s_widths
+                An array of widths of 1s Slater charge distributions:
+                rho=N exp(-r/sigma) / (8pi sigma^3) with sigma the width.
+
+           slater1s_N
+                An array of populations (=number of electrons) in the 1s Slater
+                distributions.
+
+           slater1s_Z
+                An array of effective core charges. These core charges will be
+                treated together with the 1s Slater charge distributions in the
+                code.
+
            masses
                 The atomic masses (in atomic units, i.e. m_e)
 
@@ -123,6 +137,9 @@ class System(object):
         self.bonds = bonds
         self.cell = Cell(rvecs)
         self.charges = charges
+        self.slater1s_widths = slater1s_widths
+        self.slater1s_N = slater1s_N
+        self.slater1s_Z = slater1s_Z
         self.masses = masses
         with log.section('SYS'):
             # report some stuff
@@ -400,7 +417,8 @@ class System(object):
                     from molmod.io import load_chk
                     allowed_keys = [
                         'numbers', 'pos', 'scopes', 'scope_ids', 'ffatypes',
-                        'ffatype_ids', 'bonds', 'rvecs', 'charges', 'masses',
+                        'ffatype_ids', 'bonds', 'rvecs', 'charges',
+                        'slater1s_widths', 'slater1s_N', 'slater1s_Z', 'masses',
                     ]
                     for key, value in load_chk(fn).iteritems():
                         if key in allowed_keys:
@@ -675,7 +693,7 @@ class System(object):
 
         # B) Simple repetitions
         rep_all = np.product(reps)
-        for attrname in 'numbers', 'ffatype_ids', 'scope_ids', 'charges', 'masses':
+        for attrname in 'numbers', 'ffatype_ids', 'scope_ids', 'charges', 'slater1s_widths', 'slater1s_N', 'slater1s_Z', 'masses':
             value = getattr(self, attrname)
             if value is not None:
                 new_args[attrname] = np.tile(value, rep_all)
@@ -810,6 +828,9 @@ class System(object):
         scope_ids = reduce_int_array(self.scope_ids)
         ffatype_ids = reduce_int_array(self.ffatype_ids)
         charges = reduce_float_array(self.charges)
+        slater1s_widths = reduce_float_array(self.slater1s_widths)
+        slater1s_N = reduce_float_array(self.slater1s_N)
+        slater1s_Z = reduce_float_array(self.slater1s_Z)
         masses = reduce_float_array(self.masses)
 
         # create averaged positions
@@ -833,7 +854,7 @@ class System(object):
             bonds = set((oldnew[ia], oldnew[ib]) for ia, ib in self.bonds)
             bonds = np.array([bond for bond in bonds])
 
-        return self.__class__(numbers, pos, self.scopes, scope_ids, self.ffatypes, ffatype_ids, bonds, self.cell.rvecs, charges, masses)
+        return self.__class__(numbers, pos, self.scopes, scope_ids, self.ffatypes, ffatype_ids, bonds, self.cell.rvecs, charges, slater1s_widths, slater1s_N, slater1s_Z, masses)
 
     def subsystem(self, indexes):
         '''Return a System instance in which only the given atom are retained.'''
@@ -877,6 +898,9 @@ class System(object):
             bonds=reduce_bonds(self.bonds),
             rvecs=self.cell.rvecs,
             charges=reduce_array(self.charges),
+            slater1s_widths=reduce_array(self.slater1s_widths),
+            slater1s_N=reduce_array(self.slater1s_N),
+            slater1s_Z=reduce_array(self.slater1s_Z),
             masses=reduce_array(self.masses),
         )
 
@@ -931,6 +955,9 @@ class System(object):
                 'bonds': self.bonds,
                 'rvecs': self.cell.rvecs,
                 'charges': self.charges,
+                'slater1s_widths': self.slater1s_widths,
+                'slater1s_N': self.slater1s_N,
+                'slater1s_Z': self.slater1s_Z,
                 'masses': self.masses,
             })
         elif fn.endswith('.h5'):
@@ -972,5 +999,11 @@ class System(object):
             sgrp.create_dataset('rvecs', data=self.cell.rvecs)
         if self.charges is not None:
             sgrp.create_dataset('charges', data=self.charges)
+        if self.slater1s_widths is not None:
+            sgrp.create_dataset('slater1s_widths', data=self.slater1s_widths)
+        if self.slater1s_N is not None:
+            sgrp.create_dataset('slater1s_N', data=self.slater1s_N)
+        if self.slater1s_Z is not None:
+            sgrp.create_dataset('slater1s_Z', data=self.slater1s_Z)
         if self.masses is not None:
             sgrp.create_dataset('masses', data=self.masses)
