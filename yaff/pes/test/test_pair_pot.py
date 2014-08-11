@@ -1114,7 +1114,6 @@ def get_part_4113_01WaterWater_olpslater1s1s():
     # Get a system and define scalings
     system = get_system_4113_01WaterWater()
     #system = system.subsystem([2,3])
-    #print system.radii
     nlist = NeighborList(system)
     scalings = Scalings(system, 0.0, 1.0, 1.0)
     rcut = 20*angstrom
