@@ -857,9 +857,6 @@ double pair_data_olpslater1s1s_get_corr_c(pair_pot_type *pair_pot) {
   return (*(pair_data_olpslater1s1s_type*)((*pair_pot).pair_data)).corr_c;
 }
 
-
-
-
 void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double ct_scale, double width_power) {
   pair_data_chargetransferslater1s1s_type *pair_data;
   pair_data = malloc(sizeof(pair_data_chargetransferslater1s1s_type));
@@ -911,5 +908,3 @@ double pair_data_chargetransferslater1s1s_get_width_power(pair_pot_type *pair_po
 double pair_data_eidip_get_alpha(pair_pot_type *pair_pot) {
   return (*(pair_data_eidip_type*)((*pair_pot).pair_data)).alpha;
 }
-=======
->>>>>>> Add electrostatic interaction between two 1s Slater densities

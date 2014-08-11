@@ -1181,6 +1181,13 @@ def get_part_4113_01WaterWater_chargetransferslater1s1s():
 
 
 def check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, eps, do_cores=False, mult_pop=True):
+=======
+        return E*ex_scale*(1.0+corr_c*(system.valence_charges[i]+system.valence_charges[j]))*(1.0-np.exp(corr_a-corr_b*R/np.sqrt(alpha*beta)))
+    return system, nlist, scalings, part_pair, pair_fn
+
+
+def check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, eps, do_cores=False):
+>>>>>>> Add exchange term proportional to 1s Slater overlap with optional corrections
     nlist.update() # update the neighborlists, once the rcuts are known.
     # Compute the energy using yaff.
     energy1 = part_pair.compute()
@@ -1322,6 +1329,11 @@ def test_gpos_vtens_pot_4113_01WaterWater_eislater1s1scorr():
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
 
+
+def test_gpos_vtens_pot_4113_01WaterWater_olpslater1s1s():
+    system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_olpslater1s1s()
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
 
 
 #
