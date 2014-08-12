@@ -1243,7 +1243,7 @@ def get_part_4113_01WaterWater_disp68bjdamp():
     # Get a system and define scalings
     system = get_system_4113_01WaterWater()
     #system = system.subsystem([2,3])
-    #print system.slater1s_widths
+    #print system.radii
     nlist = NeighborList(system)
     scalings = Scalings(system, 0.0, 0.0, 1.0)
     rcut = 20*angstrom
@@ -1587,6 +1587,11 @@ def test_pair_pot_4113_01WaterWater_olpslater1s1s():
 def test_pair_pot_4113_01WaterWater_disp68bjdamp():
     system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_disp68bjdamp()
     check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, 1e-8, mult_pop=False)
+
+
+def test_pair_pot_4113_01WaterWater_chargetransferslater1s1s():
+    system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_chargetransferslater1s1s()
+    check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, 1e-8)
 
 
 #
