@@ -436,7 +436,6 @@ double pair_fn_dampdisp(void *pair_data, long center_index, long other_index, do
 }
 
 
-
 void pair_data_disp68bjdamp_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *c6_cross, double *c8_cross, double *R_cross, double c6_scale, double c8_scale, double bj_a, double bj_b) {
   pair_data_disp68bjdamp_type *pair_data;
   pair_data = malloc(sizeof(pair_data_disp68bjdamp_type));
@@ -491,10 +490,10 @@ double pair_data_disp68bjdamp_get_c8_scale(pair_pot_type *pair_pot){
 double pair_data_disp68bjdamp_get_bj_a(pair_pot_type *pair_pot){
   return (*(pair_data_disp68bjdamp_type*)((*pair_pot).pair_data)).bj_a;
 }
+
 double pair_data_disp68bjdamp_get_bj_b(pair_pot_type *pair_pot){
   return (*(pair_data_disp68bjdamp_type*)((*pair_pot).pair_data)).bj_b;
 }
-
 
 
 void pair_data_ei_init(pair_pot_type *pair_pot, double *charges, double alpha, double dielectric, double *radii) {
@@ -793,8 +792,6 @@ double pair_fn_eislater1sp1spcorr(void *pair_data, long center_index, long other
   }
   return pot;
 }
-
-
 
 
 void pair_data_olpslater1s1s_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double ex_scale, double corr_a, double corr_b, double corr_c ) {
