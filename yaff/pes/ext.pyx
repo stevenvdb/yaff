@@ -2068,15 +2068,12 @@ cdef class PairPotEiSlater1s1sCorr(PairPot):
 
     def log(self):
         '''Print suitable initialization info on screen.'''
-        if log.do_medium:
-            log.hline()
-            #log('  alpha:             %s' % log.invlength(self.alpha))
         if log.do_high:
             log.hline()
-            #log('   Atom     Charge')
-            #log.hline()
-            #for i in xrange(self._c_charges.shape[0]):
-            #    log('%7i %s' % (i, log.charge(self._c_charges[i])))
+            log('   Atom  Slater charge  Core charge   Slater width')
+            log.hline()
+            for i in xrange(self._c_slater1s_widths.shape[0]):
+                log('%7i     %s   %s     %s' % (i, log.charge(self._c_slater1s_N[i]),log.charge(self._c_slater1s_Z[i]),log.length(self._c_slater1s_widths[i])))
 
     def _get_slater1s_widths(self):
         '''The atomic charges'''
@@ -2156,14 +2153,16 @@ cdef class PairPotOlpSlater1s1s(PairPot):
     def log(self):
         '''Print suitable initialization info on screen.'''
         if log.do_medium:
-            log.hline()
-            #log('  alpha:             %s' % log.invlength(self.alpha))
+            log('  ex_scale:             %s' % ("%10.5f"%self.ex_scale))
+            log('  corr_a:             %s' % ("%10.5f"%self.corr_a))
+            log('  corr_b:             %s' % ("%10.5f"%self.corr_b))
+            log('  corr_c:             %s' % ("%10.5f"%self.corr_c))
         if log.do_high:
             log.hline()
-            #log('   Atom     Charge')
-            #log.hline()
-            #for i in xrange(self._c_charges.shape[0]):
-            #    log('%7i %s' % (i, log.charge(self._c_charges[i])))
+            log('   Atom  Slater charge   Slater width')
+            log.hline()
+            for i in xrange(self._c_slater1s_widths.shape[0]):
+                log('%7i     %s     %s' % (i, log.charge(self._c_slater1s_N[i]),log.length(self._c_slater1s_widths[i])))
 
     def _get_slater1s_widths(self):
         '''The atomic charges'''
@@ -2253,14 +2252,14 @@ cdef class PairPotChargeTransferSlater1s1s(PairPot):
     def log(self):
         '''Print suitable initialization info on screen.'''
         if log.do_medium:
-            log.hline()
-            #log('  alpha:             %s' % log.invlength(self.alpha))
+            log('  ct_scale:             %s' % ("%10.5f"%self.ct_scale))
+            log('  width_power:             %s' % ("%10.5f"%self.width_power))
         if log.do_high:
             log.hline()
-            #log('   Atom     Charge')
-            #log.hline()
-            #for i in xrange(self._c_charges.shape[0]):
-            #    log('%7i %s' % (i, log.charge(self._c_charges[i])))
+            log('   Atom  Slater charge   Slater width')
+            log.hline()
+            for i in xrange(self._c_slater1s_widths.shape[0]):
+                log('%7i     %s     %s' % (i, log.charge(self._c_slater1s_N[i]),log.length(self._c_slater1s_widths[i])))
 
     def _get_slater1s_widths(self):
         '''The atomic charges'''
