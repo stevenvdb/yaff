@@ -58,7 +58,7 @@ __all__ = [
 =======
     'PairPotLJ', 'PairPotMM3', 'PairPotGrimme', 'PairPotExpRep',
     'PairPotDampDisp', 'PairPotDisp68BJDamp', 'PairPotEI', 'PairPotEIDip',
-    'PairPotEiSlater1s1sCorr', 'PairPotOlpSlater1s1s','PairPotChargeTransferSlater1s1s', 'compute_ewald_reci',
+    'PairPotEiSlater1s1sCorr', 'PairPotEiSlater1sp1spCorr', 'PairPotOlpSlater1s1s','PairPotChargeTransferSlater1s1s', 'compute_ewald_reci',
     'compute_ewald_reci_dd',  'compute_ewald_corr_dd', 'compute_ewald_corr',
     'dlist_forward', 'dlist_back', 'iclist_forward', 'iclist_back', 'iclist_jacobian',
     'iclist_hessian', 'vlist_forward', 'vlist_back', 'vlist_hessian', 'compute_grid3d',

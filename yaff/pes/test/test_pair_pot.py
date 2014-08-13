@@ -1212,10 +1212,6 @@ def get_part_4113_01WaterWater_disp68bjdamp():
     # Get a system and define scalings
     system = get_system_4113_01WaterWater()
     #system = system.subsystem([2,3])
-<<<<<<< HEAD
-=======
-    #print system.radii
->>>>>>> Add charge transfer term proportional to overlap of 1s Slater densities
     nlist = NeighborList(system)
     scalings = Scalings(system, 0.0, 0.0, 1.0)
     rcut = 20*angstrom
@@ -1655,3 +1651,7 @@ def test_pair_pot_eislater1sp1spcorr():
     # Check gradient and virial tensor
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist, symm_vtens=False)
+<<<<<<< HEAD
+=======
+>>>>>>> Add electrostatic interaction between Slater dipoles (including gradients)
+>>>>>>> Add electrostatic interaction between Slater dipoles (including gradients)
