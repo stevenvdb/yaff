@@ -28,6 +28,7 @@
 #include "pair_pot.h"
 #include "slater.h"
 
+
 pair_pot_type* pair_pot_new(void) {
   pair_pot_type* result;
   result = malloc(sizeof(pair_pot_type));

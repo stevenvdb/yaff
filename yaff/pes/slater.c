@@ -358,8 +358,6 @@ double slaterei_1_1_kronecker(double a, double b, double Na, double Za, double N
 }
 
 
-
-
 double slaterolp_0_0(double a, double b, double d, double *g){
   /* Radial part of the overlap between two sites separated
      by a distance d. Both sites contain a unit Slater monopole.
