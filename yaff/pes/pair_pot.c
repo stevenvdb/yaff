@@ -87,6 +87,7 @@ double pair_pot_compute(neigh_row_type *neighs,
                         double *gpos, double* vtens) {
   long i, srow, center_index, other_index;
   double s, energy, v, vg, h, hg;
+  double dr[3];
   energy = 0.0;
   // Reset the row counter for the scaling.
   srow = 0;
@@ -103,9 +104,14 @@ double pair_pot_compute(neigh_row_type *neighs,
       }
       // If the scale is non-zero, compute the contribution.
       if (s > 0.0) {
+        // Construct interatomic coordinates vector, needed for some pair
+        // potentials e.g. dipoles
+        dr[0] = neighs[i].dx;
+        dr[1] = neighs[i].dy;
+        dr[2] = neighs[i].dz;
         if ((gpos==NULL) && (vtens==NULL)) {
           // Call the potential function without g argument.
-          v = (*pair_pot).pair_fn((*pair_pot).pair_data, center_index, other_index, neighs[i].d, NULL);
+          v = (*pair_pot).pair_fn((*pair_pot).pair_data, center_index, other_index, neighs[i].d, dr, NULL);
           // If a truncation scheme is defined, apply it.
           if (((*pair_pot).trunc_scheme!=NULL) && (v!=0.0)) {
             v *= (*(*pair_pot).trunc_scheme).trunc_fn(neighs[i].d, (*pair_pot).rcut, (*(*pair_pot).trunc_scheme).par, NULL);
@@ -113,7 +119,7 @@ double pair_pot_compute(neigh_row_type *neighs,
         } else {
           // Call the potential function with vg argument.
           // vg is the derivative of the pair potential divided by the distance.
-          v = (*pair_pot).pair_fn((*pair_pot).pair_data, center_index, other_index, neighs[i].d, &vg);
+          v = (*pair_pot).pair_fn((*pair_pot).pair_data, center_index, other_index, neighs[i].d, dr, &vg);
           // If a truncation scheme is defined, apply it.
           if (((*pair_pot).trunc_scheme!=NULL) && ((v!=0.0) || (vg!=0.0))) {
             // hg is (a pointer to) the derivative of the truncation function.
@@ -176,7 +182,7 @@ void pair_data_lj_init(pair_pot_type *pair_pot, double *sigma, double *epsilon) 
   }
 }
 
-double pair_fn_lj(void *pair_data, long center_index, long other_index, double d, double *g) {
+double pair_fn_lj(void *pair_data, long center_index, long other_index, double d, double *dr, double *g) {
   double sigma, epsilon, x;
   sigma = 0.5*(
     (*(pair_data_lj_type*)pair_data).sigma[center_index]+
@@ -217,7 +223,7 @@ void pair_data_mm3_init(pair_pot_type *pair_pot, double *sigma, double *epsilon,
   }
 }
 
-double pair_fn_mm3(void *pair_data, long center_index, long other_index, double d, double *g) {
+double pair_fn_mm3(void *pair_data, long center_index, long other_index, double d, double *dr, double *g) {
 // E = epsilon*[1.84e5*exp(-12.0*R/sigma) - 2.25(sigma/R)^6]
   double sigma, epsilon, x, exponent;
   int onlypauli;
@@ -263,7 +269,7 @@ void pair_data_grimme_init(pair_pot_type *pair_pot, double *r0, double *c6) {
   }
 }
 
-double pair_fn_grimme(void *pair_data, long center_index, long other_index, double d, double *g) {
+double pair_fn_grimme(void *pair_data, long center_index, long other_index, double d, double *dr, double *g) {
 // E = -1.1*damp(r)*c6/r**6 met damp(r)=1.0/(1.0+exp(-20*(r/r0-1.0))) [Grimme2006]
   double r0, c6, exponent, f, d6, e;
   r0 = (
@@ -300,7 +306,7 @@ void pair_data_exprep_init(pair_pot_type *pair_pot, long nffatype, long* ffatype
   }
 }
 
-double pair_fn_exprep(void *pair_data, long center_index, long other_index, double d, double *g) {
+double pair_fn_exprep(void *pair_data, long center_index, long other_index, double d, double *dr, double *g) {
   long i;
   double amp, b, e;
   pair_data_exprep_type *pd;
@@ -353,7 +359,7 @@ double tang_toennies(double x, int order, double *g){
   return 1.0 - poly*e;
 }
 
-double pair_fn_dampdisp(void *pair_data, long center_index, long other_index, double d, double *g) {
+double pair_fn_dampdisp(void *pair_data, long center_index, long other_index, double d, double *dr, double *g) {
   long i;
   double b, disp, damp, c6;
   // Load parameters from data structure and mix
@@ -406,7 +412,7 @@ void pair_data_disp68bjdamp_init(pair_pot_type *pair_pot, long nffatype, long* f
   }
 }
 
-double pair_fn_disp68bjdamp(void *pair_data, long center_index, long other_index, double d, double *g){
+double pair_fn_disp68bjdamp(void *pair_data, long center_index, long other_index, double d, double *dr, double *g){
   long i;
   double c6, c8, R, R2, R4, R6, R8, d2, d4, d6, d8;
   // Load parameters from data structure
@@ -459,7 +465,7 @@ void pair_data_ei_init(pair_pot_type *pair_pot, double *charges, double alpha) {
   }
 }
 
-double pair_fn_ei(void *pair_data, long center_index, long other_index, double d, double *g) {
+double pair_fn_ei(void *pair_data, long center_index, long other_index, double d, double *dr, double *g) {
   double pot, alpha, qprod, x;
   qprod = (
     (*(pair_data_ei_type*)pair_data).charges[center_index]*
@@ -493,7 +499,7 @@ void pair_data_eislater1s1scorr_init(pair_pot_type *pair_pot, double *slater1s_w
   }
 }
 
-double pair_fn_eislater1s1scorr(void *pair_data, long center_index, long other_index, double d, double *g) {
+double pair_fn_eislater1s1scorr(void *pair_data, long center_index, long other_index, double d, double *dr, double *g) {
   double a, b, Za, Na, Zb, Nb;
   a  = (*(pair_data_eislater1s1scorr_type*)pair_data).widths[center_index];
   b  = (*(pair_data_eislater1s1scorr_type*)pair_data).widths[other_index];
@@ -502,6 +508,72 @@ double pair_fn_eislater1s1scorr(void *pair_data, long center_index, long other_i
   Za = (*(pair_data_eislater1s1scorr_type*)pair_data).Z[center_index];
   Zb = (*(pair_data_eislater1s1scorr_type*)pair_data).Z[other_index];
   double pot = slaterei_0_0(a,b,Na,Za,Nb,Zb,d,g);
+  return pot;
+}
+
+
+
+
+void pair_data_eislater1sp1spcorr_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double *slater1s_Z, double *slater1p_widths, double *slater1p_N, double *slater1p_Z) {
+  pair_data_eislater1sp1spcorr_type *pair_data;
+  pair_data = malloc(sizeof(pair_data_eislater1sp1spcorr_type));
+  (*pair_pot).pair_data = pair_data;
+  if (pair_data != NULL) {
+      (*pair_pot).pair_fn = pair_fn_eislater1sp1spcorr;
+      (*pair_data).widthss = slater1s_widths;
+      (*pair_data).Ns = slater1s_N;
+      (*pair_data).Zs = slater1s_Z;
+      (*pair_data).widthsp = slater1p_widths;
+      (*pair_data).Np = slater1p_N;
+      (*pair_data).Zp = slater1p_Z;
+  }
+}
+
+double pair_fn_eislater1sp1spcorr(void *pair_data, long center_index, long other_index, double d, double *dr, double *g) {
+  long i,j;
+  double a,Na,Za,b,Nb,Zb;
+  double pot = 0.0;
+  // Monopole-Monopole interaction
+  a  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthss[center_index];
+  Na = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Ns[center_index];
+  Za = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zs[center_index];
+  b  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthss[other_index];
+  Nb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Ns[other_index];
+  Zb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zs[other_index];
+  pot += slaterei_0_0(a,b,Na,Za,Nb,Zb,d,g);
+  // Monopole-Dipole interactions
+  for (i=0;i<3;i++) {
+    a  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthss[center_index];
+    Na = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Ns[center_index];
+    Za = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zs[center_index];
+    b  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthsp[3*other_index + i];
+    Nb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Np[3*other_index + i];
+    Zb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zp[3*other_index + i];
+    pot += -dr[i]*slaterei_1_0(b,a,Nb,Zb,Na,Za,d,g);
+  }
+  // Dipole-Monopole interactions
+  for (i=0;i<3;i++) {
+    a  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthsp[3*center_index+i];
+    Na = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Np[3*center_index+i];
+    Za = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zp[3*center_index+i];
+    b  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthss[other_index];
+    Nb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Ns[other_index];
+    Zb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zs[other_index];
+    pot += dr[i]*slaterei_1_0(a,b,Na,Za,Nb,Zb,d,g);
+  }
+  // Dipole-Dipole interactions
+  for (i=0;i<3;i++) {
+    for (j=0;j<3;j++) {
+      a  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthsp[3*center_index + i];
+      Na = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Np[3*center_index + i];
+      Za = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zp[3*center_index + i];
+      b  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthsp[3*other_index + j];
+      Nb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Np[3*other_index + j];
+      Zb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zp[3*other_index + j];
+      pot += -dr[i]*dr[j]*slaterei_1_1(a,b,Na,Za,Nb,Zb,d,g);
+      if (i==j) pot += slaterei_1_1_kronecker(a,b,Na,Za,Nb,Zb,d,g);
+    }
+  }
   return pot;
 }
 
@@ -524,7 +596,7 @@ void pair_data_olpslater1s1s_init(pair_pot_type *pair_pot, double *slater1s_widt
 }
 
 
-double pair_fn_olpslater1s1s(void *pair_data, long center_index, long other_index, double d, double *g) {
+double pair_fn_olpslater1s1s(void *pair_data, long center_index, long other_index, double d, double *dr, double *g) {
   double a, b, Na, Nb;
   double pot = 0.0;
   a  = (*(pair_data_olpslater1s1s_type*)pair_data).widths[center_index];
@@ -585,7 +657,7 @@ void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *sl
 }
 
 
-double pair_fn_chargetransferslater1s1s(void *pair_data, long center_index, long other_index, double d, double *g) {
+double pair_fn_chargetransferslater1s1s(void *pair_data, long center_index, long other_index, double d, double *dr, double *g) {
   double a, b, Na, Nb, fac;
   double pot = 0.0;
   a  = (*(pair_data_olpslater1s1s_type*)pair_data).widths[center_index];
