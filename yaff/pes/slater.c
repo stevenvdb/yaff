@@ -44,7 +44,6 @@ double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double 
   */
   double pot1, pot2, pot3, pot_tmp;
   double g1, g2, g3;
-  g3 = 0.0;
   // Precompute some powers and other factors
   double da = d/a;
   double db = d/b;
