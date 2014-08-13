@@ -158,6 +158,7 @@ double slaterei_1_0(double a, double b, double Na, double Za, double Nb, double 
   // Discriminate between small and large difference in Slater width
   if (fabs(a-b) > 0.025) {
     // Precompute some more factors
+
     double diff = 1.0/(a2-b2);
     double diff2 = diff*diff;
     double diff3 = diff2*diff;
