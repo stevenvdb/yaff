@@ -27,6 +27,7 @@
 #include "constants.h"
 
 
+
 double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double Zb, double d, double *g){
   /* Radial part of the electrostatic interaction between two sites separated
      by a distance d.
