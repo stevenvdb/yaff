@@ -69,6 +69,9 @@ cdef extern from "pair_pot.h":
     void pair_data_ei_init(pair_pot_type *pair_pot, double *charges, double alpha)
     double pair_data_ei_get_alpha(pair_pot_type *pair_pot)
 
+    void pair_data_eidip_init(pair_pot_type *pair_pot, double *charges, double *dipoles, double alpha)
+    double pair_data_eidip_get_alpha(pair_pot_type *pair_pot)
+
     void pair_data_eislater1s1scorr_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double *slater1s_Z)
 
     void pair_data_eislater1sp1spcorr_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double *slater1s_Z, double *slater1p_widths, double *slater1p_N, double *slater1p_Z)

@@ -29,7 +29,8 @@ from scipy.special import erfc
 from molmod import angstrom, kcalmol
 
 from yaff.test.common import get_system_water32, get_system_caffeine, \
-    get_system_2atoms, get_system_quartz, get_system_4113_01WaterWater
+    get_system_2atoms, get_system_quartz, get_system_4113_01WaterWater, \
+    get_system_water
 from yaff.pes.test.common import check_gpos_part, check_vtens_part
 
 from yaff import *
@@ -95,7 +96,7 @@ def check_pair_pot_water32(system, nlist, scalings, part_pair, pair_fn, eps, rma
                         my_delta = delta + np.array([r0,r1,r2])*9.865*angstrom
                         d = np.linalg.norm(my_delta)
                         if d <= nlist.rcut:
-                            my_energy = fac*pair_fn(a, b, d)
+                            my_energy = fac*pair_fn(a, b, d, my_delta)
                             #print 'P %3i %3i (% 3i % 3i % 3i) %10.7f %3.1f %10.3e' % (a, b, r0, r1, r2, d, fac, my_energy)
                             check_energy += my_energy
     print "energy1 % 18.15f     check_energy % 18.15f     error % 18.15f" %(energy1, check_energy, energy1-check_energy)
@@ -124,7 +125,7 @@ def get_part_water32_9A_lj():
     assert abs(pair_pot.epsilons - epsilons).max() == 0.0
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # Create a pair function:
-    def pair_fn(i, j, d):
+    def pair_fn(i, j, d, delta):
         sigma = 0.5*(sigmas[i]+sigmas[j])
         epsilon = np.sqrt(epsilons[i]*epsilons[j])
         x = (sigma/d)**6
@@ -158,7 +159,7 @@ def get_part_water32_9A_mm3():
     assert abs(pair_pot.epsilons - epsilons).max() == 0.0
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # Create a pair function:
-    def pair_fn(i, j, d):
+    def pair_fn(i, j, d, delta):
         sigma = sigmas[i]+sigmas[j]
         epsilon = np.sqrt(epsilons[i]*epsilons[j])
         x = (sigma/d)
@@ -194,7 +195,7 @@ def get_part_water32_9A_grimme():
     assert abs(pair_pot.c6 - c6s).max() == 0.0
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # Create a pair function:
-    def pair_fn(i, j, d):
+    def pair_fn(i, j, d, delta):
         r0 = (r0s[i]+r0s[j])
         c6 = np.sqrt(c6s[i]*c6s[j])
         if d<rcut:
@@ -229,7 +230,7 @@ def get_part_water32_4A_exprep(amp_mix, amp_mix_coeff, b_mix, b_mix_coeff):
     )
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # Create a pair function:
-    def pair_fn(i0, i1, d):
+    def pair_fn(i0, i1, d, delta):
         amp0 = amps[system.ffatype_ids[i0]]
         amp1 = amps[system.ffatype_ids[i1]]
         b0 = bs[system.ffatype_ids[i0]]
@@ -278,7 +279,7 @@ def get_part_water32_14A_ei():
     pair_pot = PairPotEI(system.charges, alpha, rcut)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # The pair function
-    def pair_fn(i, j, d):
+    def pair_fn(i, j, d, delta):
         return system.charges[i]*system.charges[j]*erfc(alpha*d)/d
     return system, nlist, scalings, part_pair, pair_fn
 
@@ -286,6 +287,210 @@ def get_part_water32_14A_ei():
 def test_pair_pot_ei_water32_14A():
     system, nlist, scalings, part_pair, pair_fn = get_part_water32_14A_ei()
     check_pair_pot_water32(system, nlist, scalings, part_pair, pair_fn, 1e-12, rmax=1)
+
+
+def get_part_water32_14A_eidip():
+    # Initialize system, nlist and scaling
+    system = get_system_water32()
+    #Reset charges
+    system.charges *= 0.0
+    #Set dipoles to random values
+    dipoles = np.random.rand( system.natom, 3 )
+    #Set polarizations to infinity (no energy to create dipoles)
+    poltens_i = np.tile( np.diag([0.0,0.0,0.0]) , np.array([system.natom, 1]) )
+    nlist = NeighborList(system)
+
+    scalings = Scalings(system, 1.0, 1.0, 1.0)
+    # Create the pair_pot and part_pair
+    rcut = 14*angstrom
+    alpha = 5.5/rcut
+    pair_pot = PairPotEIDip(system.charges, dipoles, alpha, rcut)
+    part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
+    part_pair.nlist.update()
+    # The pair function
+    def pair_fn(i, j, d, delta):
+        energy = 0.0
+        #Dipole-Dipole (only term for this test)
+        fac1 = erfc(alpha*d) + 2.0*alpha*d/np.sqrt(np.pi)*np.exp(-alpha**2*d**2)
+        fac2 = 3.0*erfc(alpha*d) + 4.0*alpha**3*d**3/np.sqrt(np.pi)*np.exp(-alpha**2*d**2) \
+                + 6.0*alpha*d/np.sqrt(np.pi)*np.exp(-alpha**2*d**2)
+        energy += np.dot( pair_pot.dipoles[i,:] , pair_pot.dipoles[j,:] )*fac1/d**3 - \
+                         1.0*np.dot(pair_pot.dipoles[i,:],delta)*np.dot(delta,pair_pot.dipoles[j,:])*fac2/d**5
+        return energy
+    return system, nlist, scalings, part_pair, pair_fn
+
+
+def test_pair_pot_eidip_water32_14A():
+    system, nlist, scalings, part_pair, pair_fn = get_part_water32_14A_eidip()
+    check_pair_pot_water32(system, nlist, scalings, part_pair, pair_fn, 1e-12, rmax=1)
+
+
+def get_part_water_eidip(scalings = [0.5,1.0,1.0],rcut=14.0*angstrom,switch_width=0.0*angstrom, finite=False, alpha=0.0):
+    '''
+    Make a system with one water molecule with a point dipole on every atom,
+    setup a ForcePart...
+    '''
+    # Set dipoles
+    dipoles = np.array( [[1.0,2.0,3.0],[4.0,5.0,6.0],[7.0,8.0,9.0 ]] ) # natom x 3
+    # Initialize system, nlist and scaling
+    system = get_system_water()
+    if finite:
+        #Make a system with point dipoles approximated by two charges
+        system = make_system_finite_dipoles(system, dipoles, eps=0.0001*angstrom)
+    nlist = NeighborList(system)
+    scalings = Scalings(system, scalings[0], scalings[1], scalings[2])
+    # Create the pair_pot and part_pair
+    if finite:
+        pair_pot = PairPotEI(system.charges,alpha, rcut, tr= Switch3(switch_width))
+    else:
+        pair_pot = PairPotEIDip(system.charges, dipoles, alpha, rcut, tr = Switch3(switch_width))
+    part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
+    nlist.update()
+    #Make a different nlist in case we approximate the point dipoles with charges
+    #Interactions between charges at the same site should be excluded
+    if finite:
+        neigh_dtype = [
+        ('a', int), ('b', int), ('d', float),        # a & b are atom indexes, d is the distance
+        ('dx', float), ('dy', float), ('dz', float), # relative vector (includes cell vectors of image cell)
+        ('r0', int), ('r1', int), ('r2', int)        # position of image cell.
+            ]
+        nneigh = np.sum( nlist.neighs[0:nlist.nneigh]['d'] > 0.2*angstrom )
+        new_neighs = np.zeros(nneigh, dtype=neigh_dtype)
+        counter = 0
+        for n in nlist.neighs[0:nlist.nneigh]:
+            if n['d']>0.2*angstrom:
+                new_neighs[counter] = n
+                counter += 1
+        nlist.neighs = new_neighs
+        nlist.nneigh = nneigh
+    # The pair function
+    def pair_fn(i, j, d, delta):
+        energy = 0.0
+        #Charge-Charge
+        energy += system.charges[i]*system.charges[j]/d
+        if not finite:
+            #Charge-Dipole
+            energy += system.charges[i]*np.dot(delta, pair_pot.dipoles[j,:])/d**3
+            #Dipole-Charge
+            energy -= system.charges[j]*np.dot(delta, pair_pot.dipoles[i,:])/d**3
+            #Dipole-Dipole
+            energy += np.dot( pair_pot.dipoles[i,:] , pair_pot.dipoles[j,:] )/d**3 - \
+                             3*np.dot(pair_pot.dipoles[i,:],delta)*np.dot(delta,pair_pot.dipoles[j,:])/d**5
+        if d > rcut - switch_width:
+            x = (rcut - d)/switch_width
+            energy *= (3-2*x)*x*x
+        return energy
+    return system, nlist, scalings, part_pair, pair_pot, pair_fn
+
+
+def test_pair_pot_eidip_water_finite():
+    #Compare the electrostatic energy of a system with point dipoles with the
+    #energy of a system with these dipoles approximated by two point charges
+    for alpha in 0.0, 2.0:
+        #Get the electrostatic energy of a water molecule with atomic point dipoles approximated by two charges
+        system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(scalings=[1.0,1.0,1.0],finite=True,alpha=alpha)
+        gpos1 = np.zeros(system.pos.shape, float)
+        energy1 = part_pair.compute(gpos1)
+        #Reshape gpos1
+        gpos1 = np.asarray([ np.sum( gpos1[i::3], axis=0 ) for i in xrange(system.natom/3)])
+        #Get the electrostatic energy of a water molecule with atomic point dipoles
+        system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(scalings=[1.0,1.0,1.0],finite=False,alpha=alpha)
+        gpos2 = np.zeros(system.pos.shape, float)
+        energy2 = part_pair.compute(gpos2)
+        #Finite difference approximation is not very accurate...
+        assert np.abs(energy1 - energy2) < 1.0e-5
+        assert abs(gpos1 - gpos2).max() < 1e-5
+
+
+
+
+def check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, eps):
+    # Compute the energy using yaff.
+    energy1 = part_pair.compute()
+    gpos = np.zeros(system.pos.shape, float)
+    energy2 = part_pair.compute(gpos)
+    # Compute the energy manually
+    check_energy = 0.0
+    srow = 0
+    for a in xrange(system.natom):
+        # compute the distances in the neighborlist manually and check.
+        for b in xrange(a):
+            delta = system.pos[b] - system.pos[a]
+            # find the scaling
+            srow, fac = get_scaling(scalings, srow, a, b)
+            # continue if scaled to zero
+            if fac == 0.0:
+                continue
+            d = np.linalg.norm(delta)
+            if d < nlist.rcut:
+                energy = fac*pair_fn(a, b, d, delta)
+                check_energy += energy
+    print "energy1 % 18.15f     check_energy % 18.15f     error % 18.15f" %(energy1, check_energy, energy1-check_energy)
+    print "energy2 % 18.15f     check_energy % 18.15f     error % 18.15f" %(energy2, check_energy, energy2-check_energy)
+    assert abs(energy1 - check_energy) < eps
+    assert abs(energy2 - check_energy) < eps
+
+
+def test_pair_pot_eidip_water():
+    # Setup system and force part
+    system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip()
+    # Check energy from Yaff with manually computed energy
+    check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, 1.0e-12)
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist, symm_vtens=False)
+    # Again, but with a truncation scheme (truncation scheme settings are ridiculous,
+    # but this is needed to see an effect for water)
+
+    # Setup system and force part
+    system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(rcut=2.0*angstrom,switch_width=1.5*angstrom)
+    # Check energy from Yaff with manually computed energy
+    check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, 1.0e-12)
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist, symm_vtens=False)
+
+def make_system_finite_dipoles(system, dipoles, eps=0.05*angstrom):
+    '''
+    Make a system where point dipoles are replaced by finite dipoles consisting
+    of two charges separated by eps with charges +|d|/eps and -|d|/eps.
+    Special attention has to be paid to the nlist, as we do not want to include
+    interactions between charges around the same atom.
+    '''
+    ncharges = 3 #Original charge + two charges to approximate dipole
+    newsystem = {}
+    #Copy some 'easy' attributes of the orginal system
+    #No repetitions
+    newsystem['ffatypes'] = system.ffatypes
+    newsystem['bonds'] = system.bonds #No new connections are introduced
+    #Three repetitions
+    newsystem['numbers'] = np.tile( system.numbers, ncharges)
+    newsystem['masses'] = np.tile( system.masses, ncharges)
+    newsystem['ffatype_ids'] = np.tile( system.ffatype_ids, ncharges)
+    #Cell vectors
+    newsystem['rvecs'] = system.cell.rvecs
+    #Charges
+    d_norms = np.sqrt( np.sum( dipoles**2 , axis = 1 ) )
+    ac = np.zeros( system.natom*ncharges )
+    ac[0*system.natom:1*system.natom] = system.charges
+    ac[1*system.natom:2*system.natom] = d_norms/eps*0.5
+    ac[2*system.natom:3*system.natom] = -d_norms/eps*0.5
+    newsystem['charges'] = ac
+    #Positions
+    d_norms[d_norms==0.0] = 1.0
+    pos = np.zeros( (system.natom*ncharges,3 ))
+    pos[0*system.natom:1*system.natom,:] = system.pos
+    pos[1*system.natom:2*system.natom,:] = system.pos - eps*dipoles/np.transpose(np.reshape( np.tile(d_norms,3), (3,-1) ))
+    pos[2*system.natom:3*system.natom,:] = system.pos + eps*dipoles/np.transpose(np.reshape( np.tile(d_norms,3), (3,-1) ))
+    return System(
+        numbers=newsystem['numbers'],
+        pos=pos,
+        ffatypes=newsystem['ffatypes'],
+        ffatype_ids=newsystem['ffatype_ids'],
+        bonds=newsystem['bonds'],
+        rvecs=newsystem['rvecs'],
+        charges=newsystem['charges'],
+        masses=newsystem['masses'] )
+
+
 
 
 #

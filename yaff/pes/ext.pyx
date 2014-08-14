@@ -48,11 +48,12 @@ __all__ = [
     'Cell', 'nlist_status_init', 'nlist_build', 'nlist_status_finish',
     'nlist_recompute', 'nlist_inc_r', 'Hammer', 'Switch3', 'PairPot',
     'PairPotLJ', 'PairPotMM3', 'PairPotGrimme', 'PairPotExpRep',
-    'PairPotDampDisp', 'PairPotDisp68BJDamp', 'PairPotEI',
+    'PairPotDampDisp', 'PairPotDisp68BJDamp', 'PairPotEI', 'PairPotEIDip',
     'PairPotEiSlater1s1sCorr', 'PairPotEiSlater1sp1spCorr', 'PairPotOlpSlater1s1s',
-    'PairPotChargeTransferSlater1s1s', 'compute_ewald_reci', 'compute_ewald_corr',
-    'dlist_forward', 'dlist_back', 'iclist_forward', 'iclist_back',
-    'vlist_forward', 'vlist_back', 'compute_grid3d'
+    'PairPotChargeTransferSlater1s1s', 'compute_ewald_reci', 'compute_ewald_reci_dd',
+    'compute_ewald_corr', 'compute_ewald_corr_dd', 'dlist_forward',
+    'dlist_back', 'iclist_forward', 'iclist_back', 'vlist_forward',
+    'vlist_back', 'compute_grid3d'
 ]
 
 
@@ -1415,6 +1416,72 @@ cdef class PairPotEI(PairPot):
     alpha = property(_get_alpha)
 
 
+cdef class PairPotEIDip(PairPot):
+    r'''Short-range contribution to the electrostatic interaction between point charges
+        and point dipoles.
+
+        **Arguments:**
+
+        charges
+            An array of atomic charges, shape = (natom,)
+
+        dipoles
+            An array of atomic point dipoles, shape = (natom,3)
+
+        **Optional arguments:**
+
+        tr
+            The truncation scheme, an instance of a subclass of ``Truncation``.
+            When not given, no truncation is applied
+    '''
+    cdef np.ndarray _c_charges
+    cdef np.ndarray _c_dipoles
+    name = 'eidip'
+
+    def __cinit__(self, np.ndarray[double, ndim=1] charges,
+                  np.ndarray[double, ndim=2] dipoles, double alpha, double rcut,
+                  Truncation tr=None):
+        assert charges.flags['C_CONTIGUOUS']
+        assert dipoles.flags['C_CONTIGUOUS']
+        pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
+        self.set_truncation(tr)
+        pair_pot.pair_data_eidip_init(self._c_pair_pot, <double*>charges.data,
+                     <double*>dipoles.data, alpha,)
+        if not pair_pot.pair_pot_ready(self._c_pair_pot):
+            raise MemoryError()
+        self._c_charges = charges
+        self._c_dipoles = dipoles
+
+    def log(self):
+        '''Print suitable initialization info on screen.'''
+        if log.do_high:
+            log.hline()
+            log('Atom     Radius   Dipole_x   Dipole_y   Dipole_z')
+            log.hline()
+            for i in xrange(self._c_charges.shape[0]):
+                log('%4i %s %s %s %s' % (i, log.charge(self._c_charges[i]),\
+                log.charge(self._c_dipoles[i,0]), log.charge(self._c_dipoles[i,1]),\
+                log.charge(self._c_dipoles[i,2])))
+
+    def _get_charges(self):
+        '''The atomic charges'''
+        return self._c_charges.view()
+
+    charges = property(_get_charges)
+
+    def _get_dipoles(self):
+        '''The atomic charges'''
+        return self._c_dipoles.view()
+
+    dipoles = property(_get_dipoles)
+
+    def _get_alpha(self):
+        '''The alpha parameter in the Ewald summation method'''
+        return pair_pot.pair_data_eidip_get_alpha(self._c_pair_pot)
+
+    alpha = property(_get_alpha)
+
+
 cdef class PairPotEiSlater1s1sCorr(PairPot):
     r'''Electrostatic interaction between sites with a point core charge and a
         1s Slater charge density MINUS the electrostatic interaction between
@@ -1890,6 +1957,100 @@ def compute_ewald_reci(np.ndarray[double, ndim=2] pos,
                                     my_vtens)
 
 
+def compute_ewald_reci_dd(np.ndarray[double, ndim=2] pos,
+                       np.ndarray[double, ndim=1] charges,
+                       np.ndarray[double, ndim=2] dipoles,
+                       Cell unitcell, double alpha,
+                       np.ndarray[long, ndim=1] jmax, double kcut,
+                       np.ndarray[double, ndim=2] gpos,
+                       np.ndarray[double, ndim=1] work,
+                       np.ndarray[double, ndim=2] vtens):
+    '''Compute the reciprocal interaction term in the Ewald summation scheme
+
+       **Arguments:**
+
+       pos
+            The atomic positions. numpy array with shape (natom,3).
+
+       charges
+            The atomic charges. numpy array with shape (natom,).
+
+       dipoles
+            The atomic dipoles. numpy array with shape (natom,3).
+
+       unitcell
+            An instance of the ``Cell`` class that describes the periodic
+            boundary conditions.
+
+       alpha
+            The :math:`\\alpha` parameter from the Ewald summation scheme.
+
+       jmax
+            The maximum range of periodic images in reciprocal space to be
+            considered for the Ewald sum. integer numpy array with shape (3,).
+            Each element gives the range along the corresponding reciprocal
+            cell vector. The range along each axis goes from -jmax[0] to
+            jmax[0] (inclusive).
+
+       kcut
+            The cutoff in reciprocal space. The caller is responsible for the
+            compatibility of ``kcut`` with ``jmax``.
+
+       gpos
+            If not set to None, the Cartesian gradient of the energy is
+            stored in this array. numpy array with shape (natom, 3).
+
+       work
+            If gpos is given, this work array must also be present. Its
+            contents will be overwritten. numpy array with shape (2*natom,).
+
+       vtens
+            If not set to None, the virial tensor is computed and stored in
+            this array. numpy array with shape (3, 3).
+    '''
+    cdef double *my_gpos
+    cdef double *my_work
+    cdef double *my_vtens
+
+    assert pos.flags['C_CONTIGUOUS']
+    assert pos.shape[1] == 3
+    assert charges.flags['C_CONTIGUOUS']
+    assert charges.shape[0] == pos.shape[0]
+    assert dipoles.flags['C_CONTIGUOUS']
+    assert dipoles.shape[0] == pos.shape[0]
+    assert unitcell.nvec == 3
+    assert alpha > 0
+    assert jmax.flags['C_CONTIGUOUS']
+    assert jmax.shape[0] == 3
+
+    if gpos is None:
+        my_gpos = NULL
+        my_work = NULL
+    else:
+        assert gpos.flags['C_CONTIGUOUS']
+        assert gpos.shape[1] == 3
+        assert gpos.shape[0] == pos.shape[0]
+        assert work.flags['C_CONTIGUOUS']
+        assert gpos.shape[0]*2 == work.shape[0]
+        my_gpos = <double*>gpos.data
+        my_work = <double*>work.data
+
+    if vtens is None:
+        my_vtens = NULL
+    else:
+        assert vtens.flags['C_CONTIGUOUS']
+        assert vtens.shape[0] == 3
+        assert vtens.shape[1] == 3
+        my_vtens = <double*>vtens.data
+
+    return ewald.compute_ewald_reci_dd(<double*>pos.data, len(pos),
+                                    <double*>charges.data,
+                                    <double*>dipoles.data,
+                                    unitcell._c_cell, alpha,
+                                    <long*>jmax.data, kcut, my_gpos, my_work,
+                                    my_vtens)
+
+
 def compute_ewald_corr(np.ndarray[double, ndim=2] pos,
                        np.ndarray[double, ndim=1] charges,
                        Cell unitcell, double alpha,
@@ -1957,6 +2118,80 @@ def compute_ewald_corr(np.ndarray[double, ndim=2] pos,
 
     return ewald.compute_ewald_corr(
         <double*>pos.data, <double*>charges.data, unitcell._c_cell, alpha,
+        <pair_pot.scaling_row_type*>stab.data, len(stab), my_gpos,
+        my_vtens, len(pos)
+    )
+
+
+def compute_ewald_corr_dd(np.ndarray[double, ndim=2] pos,
+                       np.ndarray[double, ndim=1] charges,
+                       np.ndarray[double, ndim=2] dipoles,
+                       Cell unitcell, double alpha,
+                       np.ndarray[pair_pot.scaling_row_type, ndim=1] stab,
+                       np.ndarray[double, ndim=2] gpos,
+                       np.ndarray[double, ndim=2] vtens):
+    '''Compute the corrections to the reciprocal Ewald term due to scaled
+       short-range non-bonding interactions.
+
+       **Arguments:**
+
+       pos
+            The atomic positions. numpy array with shape (natom,3).
+
+       charges
+            The atomic charges. numpy array with shape (natom,).
+
+       unitcell
+            An instance of the ``Cell`` class that describes the periodic
+            boundary conditions.
+
+       alpha
+            The :math:`\\alpha` parameter from the Ewald summation scheme.
+
+       stab
+            The table with (sorted) pairs of atoms whose electrostatic
+            interactions are scaled. Each record corresponds to one pair
+            and contains the corresponding amount of scaling. See
+            ``pair_pot.scaling_row_type``
+
+       gpos
+            If not set to None, the Cartesian gradient of the energy is
+            stored in this array. numpy array with shape (natom, 3).
+
+       vtens
+            If not set to None, the virial tensor is computed and stored in
+            this array. numpy array with shape (3, 3).
+    '''
+
+    cdef double *my_gpos
+    cdef double *my_vtens
+
+    assert pos.flags['C_CONTIGUOUS']
+    assert pos.shape[1] == 3
+    assert dipoles.flags['C_CONTIGUOUS']
+    assert dipoles.shape[0] == pos.shape[0]
+    assert dipoles.shape[1] == pos.shape[1]
+    assert alpha > 0
+    assert stab.flags['C_CONTIGUOUS']
+
+    if gpos is None:
+        my_gpos = NULL
+    else:
+        assert gpos.flags['C_CONTIGUOUS']
+        assert gpos.shape[1] == 3
+        assert gpos.shape[0] == pos.shape[0]
+        my_gpos = <double*>gpos.data
+
+    if vtens is None:
+        my_vtens = NULL
+    else:
+        assert vtens.flags['C_CONTIGUOUS']
+        assert vtens.shape[0] == 3
+        assert vtens.shape[1] == 3
+        my_vtens = <double*>vtens.data
+
+    return ewald.compute_ewald_corr_dd(
+        <double*>pos.data, <double*>charges.data, <double*>dipoles.data, unitcell._c_cell, alpha,
         <pair_pot.scaling_row_type*>stab.data, len(stab), my_gpos,
         my_vtens, len(pos)
     )

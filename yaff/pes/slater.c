@@ -95,7 +95,7 @@ double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double 
     pot3 += pot_tmp;
   }
   double pot = Na*Zb*pot1 + Za*Nb*pot2 + Na*Nb*pot3;
-  if (g != NULL) *g += (Na*Zb*g1 + Za*Nb*g2 + Na*Nb*g3)/d;
+  if (g != NULL) *g = (Na*Zb*g1 + Za*Nb*g2 + Na*Nb*g3)/d;
   return pot;
 }
 

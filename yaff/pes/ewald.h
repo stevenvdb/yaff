@@ -32,9 +32,16 @@ double compute_ewald_reci(double *pos, long natom, double *charges,
                           cell_type* unitcell, double alpha, long *gmax,
                           double gcut, double *gpos, double *work,
                           double* vtens);
+double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *dipoles,
+                          cell_type* unitcell, double alpha, long *gmax,
+                          double gcut, double *gpos, double *work,
+                          double* vtens);
 double compute_ewald_corr(double *pos, double *charges,
                           cell_type *unitcell, double alpha,
                           scaling_row_type *stab, long stab_size,
                           double *gpos, double *vtens, long natom);
-
+double compute_ewald_corr_dd(double *pos, double *charges, double *dipoles,
+                          cell_type *unitcell, double alpha,
+                          scaling_row_type *stab, long stab_size,
+                          double *gpos, double *vtens, long natom);
 #endif
