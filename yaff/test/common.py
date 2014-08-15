@@ -103,6 +103,23 @@ def get_system_water():
     )
 
 
+def get_system_water_polarizable():
+    return System(
+        numbers=np.array([8, 1, 1]),
+        pos=np.array([
+            [-4.583, 5.333, 1.560],
+            [-3.777, 5.331, 0.943],
+            [-5.081, 4.589, 1.176],
+        ])*angstrom,
+        ffatypes=['O', 'H', 'H'],
+        bonds=np.array([[0,1], [0, 2]]),
+        rvecs=None,
+        slater1s_widths = np.array([0.41,0.36,0.36]),
+        slater1s_N = np.array([-6.4,-1.0,-1.0]),
+        slater1s_Z = np.array([6.4,1.0,1.0]),
+    )
+
+
 def get_system_graphene8():
    return System(
         numbers=np.array([6]*8),

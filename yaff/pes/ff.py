@@ -52,6 +52,7 @@ __all__ = [
     'ForcePart', 'ForceField', 'ForcePartPair', 'ForcePartEwaldReciprocal',
     'ForcePartEwaldCorrection', 'ForcePartEwaldNeutralizing',
     'ForcePartValence', 'ForcePartPressure', 'ForcePartGrid',
+    'ForcePartPolarizationEnergy',
 ]
 
 
@@ -459,6 +460,34 @@ class ForcePartEwaldNeutralizing(ForcePart):
             if vtens is not None:
                 vtens.ravel()[::4] -= fac
             return fac
+
+
+class ForcePartPolarizationEnergy(ForcePart):
+    '''Term that represents the cost associated with inducing multipoles
+    Note that this is just a dummy class. Nothing really happens here, at the
+    moment a polarizable model implemented as a Hook should compute the
+    polarization energy and report this information here.
+    '''
+    def __init__(self, system):
+        '''
+           **Arguments:**
+
+           system
+                The system to which this interaction applies.
+        '''
+        ForcePart.__init__(self, 'polarization', system)
+        self.system = system
+        self.pol_energy = 0.0
+
+    def set_pol_energy(self, pol_energy):
+        self.pol_energy = pol_energy
+
+    def _internal_compute(self, gpos, vtens):
+        # I don't think there is a contribution to gpos, because of a Hellmann-
+        # Feynman like theorem. Remember that induced multipoles generally
+        # come from a variational principle. There is also no contribution to
+        # the virial tensor but someone should double check this
+        return self.pol_energy
 
 
 class ForcePartValence(ForcePart):
