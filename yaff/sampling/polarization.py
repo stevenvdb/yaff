@@ -262,7 +262,7 @@ class Polarization_FSPM_ISD(Hook):
     '''
     Fixed Slater and Point Monopole with Induced Slater Dipole. 
     '''
-    def __init__(self, start=0, step=1):
+    def __init__(self, start=0, step=1, exclude=None):
         """
            **Arguments:**
 
@@ -273,7 +273,13 @@ class Polarization_FSPM_ISD(Hook):
 
            step
                 The hook will be called every `step` iterations.
+
+           exclude
+                Specify list of pairs of atoms that should not induce each other.
+                This can be used for instance to discard intramonomer polarization,
+                by specifying a list of all atoms that are somehow connected.
         """
+        self.exclude = exclude
         Hook.__init__(self, start, step)
 
     def __call__(self, iterative):
@@ -302,6 +308,19 @@ class Polarization_FSPM_ISD(Hook):
         Tff = construct_ei_tensor_monomono(iterative)
         Tvv = construct_ei_tensor_dipdip(iterative)
         Tfv = construct_ei_tensor_monodip(iterative)
+
+        #
+        # Throw away unwanted interactions
+        #
+
+        if self.exclude is not None:
+            for iatom0, iatom1 in self.exclude:
+                Tff[nbf*iatom0:nbf*(iatom0+1),nbf*iatom1:nbf*(iatom1+1)] *= 0.0
+                Tff[nbf*iatom1:nbf*(iatom1+1),nbf*iatom0:nbf*(iatom0+1)] *= 0.0
+                Tvv[nbv*iatom0:nbv*(iatom0+1),nbv*iatom1:nbv*(iatom1+1)] *= 0.0
+                Tvv[nbv*iatom1:nbv*(iatom1+1),nbv*iatom0:nbv*(iatom0+1)] *= 0.0
+                Tfv[nbf*iatom0:nbf*(iatom0+1),nbv*iatom1:nbv*(iatom1+1)] *= 0.0
+                Tfv[nbf*iatom1:nbf*(iatom1+1),nbv*iatom0:nbv*(iatom0+1)] *= 0.0
 
         #
         # Fill up diagonal elements of tensors

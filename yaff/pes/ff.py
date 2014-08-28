@@ -468,7 +468,7 @@ class ForcePartPolarizationEnergy(ForcePart):
     moment a polarizable model implemented as a Hook should compute the
     polarization energy and report this information here.
     '''
-    def __init__(self, system):
+    def __init__(self, system, nlist, scalings, pair_pot):
         '''
            **Arguments:**
 
@@ -477,6 +477,9 @@ class ForcePartPolarizationEnergy(ForcePart):
         '''
         ForcePart.__init__(self, 'polarization', system)
         self.system = system
+        self.nlist = nlist
+        self.scalings = scalings
+        self.pair_pot = pair_pot
         self.pol_energy = 0.0
 
     def set_pol_energy(self, pol_energy):
