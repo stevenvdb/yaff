@@ -37,6 +37,7 @@ __all__ = [
     'get_system_2T', 'get_system_peroxide', 'get_system_mil53',
     'get_system_2atoms', 'get_2systems_2oxygens', 'get_system_formaldehyde',
     'get_system_amoniak', 'get_system_4113_01WaterWater',
+    'get_system_2atoms', 'get_2systems_2oxygens',
 ]
 
 

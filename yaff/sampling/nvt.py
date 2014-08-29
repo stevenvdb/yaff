@@ -102,7 +102,7 @@ class AndersenThermostat(VerletHook):
         pass
 
 class NHChain(object):
-    def __init__(self, length, timestep, temp, ndof, timecon=100*femtosecond):
+    def __init__(self, length, timestep, temp, ndof, barostat, timecon=100*femtosecond):
         # parameters
         self.length = length
         self.timestep = timestep
@@ -114,6 +114,7 @@ class NHChain(object):
         # allocate degrees of freedom
         self.pos = np.zeros(length)
         self.vel = np.zeros(length)
+
 
     def set_ndof(self, ndof):
         # set the masses according to the time constant
@@ -159,6 +160,10 @@ class NHChain(object):
         for k in xrange(self.length-1, -1, -1):
             do_bead(k, ekin)
 
+
+        # iL (G_g - vxi_1 vg) h/4 if barostat is present
+        if barostat is not None:
+            barostat.propagate_press(self.vel[0], self.ndof, ekin, vel, masses, volume, iterative)
         # iL xi (all) h/2
         self.pos += self.vel*self.timestep/2
         # iL Cv (all) h/2
@@ -179,7 +184,7 @@ class NHChain(object):
 
 
 class NHCThermostat(VerletHook):
-    def __init__(self, temp, start=0, timecon=100*femtosecond, chainlength=3):
+    def __init__(self, temp, start=0, timecon=100*femtosecond, chainlength=3, barostat = None):
         """
            This hook implements the Nose-Hoover-Chain thermostat. The equations
            are derived in:
@@ -208,12 +213,12 @@ class NHCThermostat(VerletHook):
 
            chainlength
                 The number of beads in the Nose-Hoover chain.
-
         """
         self.temp = temp
         # At this point, the timestep and the number of degrees of freedom are
         # not known yet.
-        self.chain = NHChain(chainlength, 0.0, temp, 0, timecon)
+        self.chain = NHChain(chainlength, 0.0, temp, 0, barostat, timecon)
+        self.barostat = barostat
         VerletHook.__init__(self, start, 1)
 
     def init(self, iterative):
@@ -235,6 +240,8 @@ class NHCThermostat(VerletHook):
         vel_new, iterative.ekin = self.chain(ekin, iterative.vel, G1_add)
         iterative.vel[:] = vel_new
         self.econs_correction = self.chain.get_econs_correction()
+        if self.barostat is not None:
+            self.econs_correction += self.barostat.get_econs_correction(self.chain.pos[0], iterative.ff.system.cell.volume)
 
 class LangevinThermostat(VerletHook):
     def __init__(self, temp, start=0, timecon=100*femtosecond):

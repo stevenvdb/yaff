@@ -670,6 +670,7 @@ class OopDistGenerator(ValenceGenerator):
             if len(neighbours)==3:
                 yield neighbours[0],neighbours[1],neighbours[2],atom
 
+
 class ValenceCrossGenerator(Generator):
     '''All generators for cross valence terms derive from this class.
 
@@ -806,6 +807,7 @@ class CrossGenerator(ValenceCrossGenerator):
 
     def get_indexes2(self, indexes):
         return indexes
+
 
 class NonbondedGenerator(Generator):
     '''All generators for the non-bonding interactions derive from this class

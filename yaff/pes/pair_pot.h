@@ -202,4 +202,5 @@ void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *sl
 double pair_fn_chargetransferslater1s1s(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *g_cart);
 double pair_data_chargetransferslater1s1s_get_ct_scale(pair_pot_type *pair_pot);
 double pair_data_chargetransferslater1s1s_get_width_power(pair_pot_type *pair_pot);
+
 #endif

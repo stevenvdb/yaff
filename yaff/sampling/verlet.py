@@ -182,7 +182,6 @@ class VerletIntegrator(Iterative):
         # Allow specialized hooks to modify the state before the regular verlet
         # step.
         self.call_verlet_hooks('pre')
-
         # Regular verlet step
         self.gpos[:] = 0.0
         self.vtens[:] = 0.0

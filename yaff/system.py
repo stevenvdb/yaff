@@ -419,6 +419,7 @@ class System(object):
                         'numbers', 'pos', 'scopes', 'scope_ids', 'ffatypes',
                         'ffatype_ids', 'bonds', 'rvecs', 'charges',
                         'slater1s_widths', 'slater1s_N', 'slater1s_Z', 'masses',
+                        'ffatype_ids', 'bonds', 'rvecs', 'charges', 'masses',
                     ]
                     for key, value in load_chk(fn).iteritems():
                         if key in allowed_keys:
