@@ -64,7 +64,7 @@ def test_polarization_FSPM_ISD():
     Check that induced dipoles are set from our polarization model.
     '''
     system, nlist, scalings, part_pair_ei, part_pair_slatercorr = get_part_water_eidip()
-    part_polarization = ForcePartPolarizationEnergy(system)
+    part_polarization = ForcePartPolarizationEnergy(system, None, None, None)
     ff = ForceField(system, [part_pair_ei,part_pair_slatercorr,part_polarization], nlist)
     iterative = Iterative(ff,hooks=Polarization_FSPM_ISD())
     # Check that at least one of the induced dipoles now has a non-zero value
@@ -75,7 +75,7 @@ def test_polarization_FSPM_ISD():
 
 def test_ei_tensor_monomono():
     system, nlist, scalings, part_pair_ei, part_pair_slatercorr = get_part_water_eidip()
-    part_polarization = ForcePartPolarizationEnergy(system)
+    part_polarization = ForcePartPolarizationEnergy(system, None, None, None)
     ff = ForceField(system, [part_pair_ei,part_pair_slatercorr,part_polarization], nlist)
     iterative = Iterative(ff,hooks=Polarization_FSPM_ISD())
     iterative.ff.part_pair_eislater1sp1spcorr.pair_pot.slater1p_N[:] *= 0.0
@@ -95,7 +95,7 @@ def test_ei_tensor_monomono():
 
 def test_ei_tensor_dipdip():
     system, nlist, scalings, part_pair_ei, part_pair_slatercorr = get_part_water_eidip()
-    part_polarization = ForcePartPolarizationEnergy(system)
+    part_polarization = ForcePartPolarizationEnergy(system, None, None, None)
     ff = ForceField(system, [part_pair_ei,part_pair_slatercorr,part_polarization], nlist)
     iterative = Iterative(ff,hooks=Polarization_FSPM_ISD())
     iterative.ff.part_pair_eislater1sp1spcorr.pair_pot.slater1s_N[:] *= 0.0
@@ -117,7 +117,7 @@ def test_ei_tensor_dipdip():
 
 def test_ei_tensor_monodip():
     system, nlist, scalings, part_pair_ei, part_pair_slatercorr = get_part_water_eidip()
-    part_polarization = ForcePartPolarizationEnergy(system)
+    part_polarization = ForcePartPolarizationEnergy(system, None, None, None)
     ff = ForceField(system, [part_pair_ei,part_pair_slatercorr,part_polarization], nlist)
     iterative = Iterative(ff,hooks=Polarization_FSPM_ISD())
     # Setup vector with monopoles

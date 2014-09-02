@@ -24,6 +24,7 @@
 
 
 import h5py as h5
+from nose.plugins.skip import SkipTest
 
 from yaff import *
 
@@ -79,6 +80,7 @@ def test_dlpoly_history_sam():
 
 
 def test_dlpoly_history_an():
+    raise SkipTest
     with h5.File('yaff.conversion.test.test_dlpoly.test_dlpoly_history_an.h5', driver='core', backing_store=False) as f:
         # Bad practice. The trajectory file has no system directory...
         # Actual trajectory conversion, par1

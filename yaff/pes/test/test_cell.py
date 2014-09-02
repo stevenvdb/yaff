@@ -76,12 +76,12 @@ def test_cell_polyethylene4():
     assert abs(np.dot(cell.gvecs, cell.rvecs.transpose()) - 1) < 1e-5
     vec1 = np.array([10.0, 0.0, 105.0])*angstrom
     cell.mic(vec1)
-    assert abs(vec1 - np.array([-0.15, -0.374, 104.89])*angstrom).max() < 1e-3
+    assert abs(vec1 - np.array([-0.075, -0.187, 104.945])*angstrom).max() < 1e-3
     vec2 = np.array([10.0, 0.0, 105.0])*angstrom
     cell.add_vec(vec2, cell.to_center(vec2))
     assert abs(vec1 - vec2).max() < 1e-10
     cell.add_vec(vec1, np.array([1]))
-    assert abs(vec1 - np.array([4.925, -0.187, 104.945])*angstrom).max() < 1e-3
+    assert abs(vec1 - np.array([10.0, 0.0, 105.0])*angstrom).max() < 1e-3
 
 
 def test_cell_quartz():

@@ -605,7 +605,7 @@ def test_add_part():
     assert ff.compute() == ff.part_valence.energy + ff.part_press.energy
 
 
-def test_generator_formaldehyde_oopangle():
+def test_generator_formaldehyde_oopcos():
     system = get_system_formaldehyde()
     fn_pars = context.get_fn('test/parameters_formaldehyde_inversion.txt')
     ff = ForceField.generate(system, fn_pars)
