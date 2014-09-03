@@ -47,7 +47,6 @@ from yaff.log import log
 __all__ = [
     'Cell', 'nlist_status_init', 'nlist_build', 'nlist_status_finish',
     'nlist_recompute', 'nlist_inc_r', 'Hammer', 'Switch3', 'PairPot',
-<<<<<<< HEAD
     'PairPotLJ', 'PairPotMM3', 'PairPotGrimme', 'PairPotExpRep', 'PairPotLJCross',
     'PairPotDampDisp', 'PairPotDisp68BJDamp', 'PairPotEI', 'PairPotEIDip',
     'PairPotEiSlater1s1sCorr', 'PairPotEiSlater1sp1spCorr', 'PairPotOlpSlater1s1s',
@@ -55,14 +54,12 @@ __all__ = [
     'compute_ewald_corr', 'compute_ewald_corr_dd', 'dlist_forward',
     'dlist_back', 'iclist_forward', 'iclist_back', 'iclist_jacobian', 'iclist_hessian',
     'vlist_forward', 'vlist_back', 'vlist_hessian', 'compute_grid3d'
-=======
-    'PairPotLJ', 'PairPotMM3', 'PairPotGrimme', 'PairPotExpRep',
+    'PairPotLJ', 'PairPotMM3', 'PairPotGrimme', 'PairPotExpRep', 'PairPotLJCross',
     'PairPotDampDisp', 'PairPotDisp68BJDamp', 'PairPotEI', 'PairPotEIDip',
     'PairPotEiSlater1s1sCorr', 'PairPotEiSlater1sp1spCorr', 'PairPotOlpSlater1s1s','PairPotChargeTransferSlater1s1s', 'compute_ewald_reci',
     'compute_ewald_reci_dd',  'compute_ewald_corr_dd', 'compute_ewald_corr',
     'dlist_forward', 'dlist_back', 'iclist_forward', 'iclist_back', 'iclist_jacobian',
     'iclist_hessian', 'vlist_forward', 'vlist_back', 'vlist_hessian', 'compute_grid3d',
->>>>>>> Add dispersion term with c6 and c8 contribution with Becke-Johnson damping
 ]
 
 
@@ -1445,7 +1442,6 @@ cdef class PairPotDisp68BJDamp(PairPot):
 
     R_cross = property(_get_R_cross)
 
-<<<<<<< HEAD
     def _get_c6_scale(self):
         '''Global scaling of C6 coefficients'''
         return pair_pot.pair_data_disp68bjdamp_get_c6_scale(self._c_pair_pot)
@@ -1470,8 +1466,6 @@ cdef class PairPotDisp68BJDamp(PairPot):
 
     bj_b = property(_get_bj_b)
 
-=======
->>>>>>> Add dispersion term with c6 and c8 contribution with Becke-Johnson damping
 
 cdef class PairPotEI(PairPot):
     r'''Short-range contribution to the electrostatic interaction between point charges
