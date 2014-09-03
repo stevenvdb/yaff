@@ -137,7 +137,6 @@ double pair_pot_compute(neigh_row_type *neighs,
           vg_cart[0] = 0.0; //vg_cart is reset here because not all pair_fn set it.
           vg_cart[1] = 0.0;
           vg_cart[2] = 0.0;
-<<<<<<< HEAD
           if (hess==NULL) {
             v = (*pair_pot).pair_fn((*pair_pot).pair_data, center_index, other_index, neighs[i].d, delta, &vg, NULL, vg_cart);
           } else {
@@ -163,13 +162,6 @@ double pair_pot_compute(neigh_row_type *neighs,
           // If a switchon scheme is defined, apply it.
           // TODO: include vg_cart (not necessary as long as the switchon scheme only depends on distance)
           if (((*pair_pot).switchon_scheme!=NULL) && ((v!=0.0) || (vg!=0.0) || (hess!=NULL && vgg!=0.0))) {
-=======
-          // vg is the derivative of the pair potential to d divided by the distance.
-          v = (*pair_pot).pair_fn((*pair_pot).pair_data, center_index, other_index, neighs[i].d, delta, &vg, vg_cart);
-          // If a truncation scheme is defined, apply it.
-          // TODO: include vg_cart (not necessary as long as the truncation scheme only depends on distance)
-          if (((*pair_pot).trunc_scheme!=NULL) && ((v!=0.0) || (vg!=0.0))) {
->>>>>>> Add electrostatic interaction between Slater dipoles (including gradients)
             // hg is (a pointer to) the derivative of the truncation function.
             if (hess==NULL) {
               h = (*(*pair_pot).switchon_scheme).switchon_fn((*(*pair_pot).switchon_scheme).switchon_data,

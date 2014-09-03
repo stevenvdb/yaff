@@ -1658,6 +1658,12 @@ def test_gpos_vtens_pair_pot_caffeine_ljcross_9A():
     check_vtens_part(system, part_pair, nlist)
 
 
+def test_gpos_vtens_pair_pot_caffeine_ljcross_9A():
+    system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_ljcross_9A()
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
+
+
 def test_gpos_vtens_pair_pot_caffeine_dampdisp_9A():
     system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_dampdisp_9A()
     check_gpos_part(system, part_pair, nlist)
