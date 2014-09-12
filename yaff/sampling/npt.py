@@ -222,7 +222,223 @@ class McDonaldBarostat(VerletHook):
                     log('THERMO energy change %s' % log.energy(ekin0 - ekin1))
 
 
-class MartynaTobiasKleinBarostat(VerletHook):
+class BerendsenBarostat(VerletHook):
+    def __init__(self, ff, temp, press, start=0, timecon=1000*femtosecond, beta = 4.57e-5/bar, anisotropic=True):
+        """
+            This hook implements the Berendsen barostat. The equations are derived in:
+
+                Berendsen, H. J. C.; Postma, J. P. M.; van Gunsteren, W. F.;
+                Dinola, A.; Haak, J. R. J. Chem. Phys. 1984, 81, 3684-3690
+
+            **Arguments:**
+
+            ff
+                A ForceField instance.
+
+            temp
+                The temperature of thermostat.
+
+            press
+                The applied pressure for the barostat.
+
+            **Optional arguments:**
+
+            start
+                The step at which the thermostat becomes active.
+
+            timecon
+                The time constant of the Berendsen barostat.
+
+            beta
+                The isothermal compressibility, conventionally the compressibility of liquid water
+        """
+        self.temp = temp
+        self.press = press
+        self.mass_press = 3.0*timecon/beta
+        self.anisotropic = anisotropic
+        cell_symmetrize(ff)
+        self.cell = ff.system.cell.rvecs.copy()
+        self.dim = ff.system.cell.nvec
+        VerletHook.__init__(self, start, 1)
+
+    def init(self, iterative):
+        self.timestep_press = iterative.timestep
+        # compute gpos and vtens, since they differ
+        # after symmetrising the cell tensor
+        iterative.gpos = np.zeros(iterative.pos.shape, float)
+        iterative.vtens = np.zeros((3,3),float)
+        epot0 = iterative.ff.compute(iterative.gpos,iterative.vtens)
+
+    def pre(self, iterative, chainvel0 = None):
+        # calculation of the virial tensor
+        iterative.gpos = np.zeros(iterative.pos.shape, float)
+        iterative.vtens = np.zeros((3,3),float)
+        epot0 = iterative.ff.compute(iterative.gpos,iterative.vtens)
+        # calculation of the internal pressure tensor
+        ptens = (np.dot(iterative.vel.T*iterative.masses, iterative.vel) - iterative.vtens)/iterative.ff.system.cell.volume
+        # determination of mu
+        mu = np.eye(3)-self.timestep_press/self.mass_press*(self.press*np.eye(3)-ptens)
+        mu = 0.5*(mu+mu.T)
+        if not self.anisotropic:
+            mu = ((np.trace(mu)/3.0)**(1.0/3.0))*np.eye(3)
+        # updating the positions and cell vectors
+        pos_new = np.dot(iterative.pos, mu)
+        rvecs_new = np.dot(iterative.rvecs, mu)
+        iterative.ff.update_pos(pos_new)
+        iterative.pos[:] = pos_new
+        iterative.ff.update_rvecs(rvecs_new)
+        iterative.rvecs[:] = rvecs_new
+        epot1 = iterative.ff.compute(iterative.gpos,iterative.vtens)
+        self.econs_correction += epot0 - epot1
+
+    def post(self, iterative, chainvel0 = None):
+        pass
+
+class LangevinBarostat(VerletHook):
+    def __init__(self, ff, temp, press, start=0, anisotropic = True, timecon=1000*femtosecond):
+        """
+            This hook implements the Langevin barostat. The equations are derived in:
+
+                Feller, S. E.; Zhang, Y.; Pastor, R. W.; Brooks, B. R.
+                J. Chem. Phys. 1995, 103, 4613-4621
+
+            **Arguments:**
+
+            ff
+                A ForceField instance.
+
+            temp
+                The temperature of thermostat.
+
+            press
+                The applied pressure for the barostat.
+
+            **Optional arguments:**
+
+            start
+                The step at which the barostat becomes active.
+
+            timecon
+                The time constant of the Langevin barostat.
+        """
+        self.temp = temp
+        self.press = press
+        self.timecon = timecon
+        self.anisotropic = anisotropic
+        cell_symmetrize(ff)
+        self.cell = ff.system.cell.rvecs.copy()
+        self.dim = ff.system.cell.nvec
+        VerletHook.__init__(self, start, 1)
+
+    def init(self, iterative):
+        self.timestep_press = iterative.timestep
+        clean_momenta(iterative.pos, iterative.vel, iterative.masses, iterative.ff.system.cell)
+        # define the barostat 'mass'
+        self.ndof = get_ndof_internal_md(len(iterative.ff.system.numbers), iterative.ff.system.cell.nvec)
+        self.mass_press = (self.ndof+3)/3*boltzmann*self.temp*(self.timecon/(2*np.pi))**2
+        # define initial barostat velocity
+        self.vel_press = get_random_vel_press(self.mass_press, self.temp)
+        if not self.anisotropic:
+            self.vel_press = self.vel_press[0][0]
+        # compute gpos and vtens, since they differ
+        # after symmetrising the cell tensor
+        iterative.gpos = np.zeros(iterative.pos.shape, float)
+        iterative.vtens = np.zeros((3,3),float)
+        energy = iterative.ff.compute(iterative.gpos,iterative.vtens)
+
+    def pre(self, iterative, chainvel0 = None):
+        iterative.gpos = np.zeros(iterative.pos.shape, float)
+        iterative.vtens = np.zeros((3,3),float)
+        epot0 = iterative.ff.compute(iterative.gpos,iterative.vtens)
+        ekin0 = iterative._compute_ekin()
+        self.baro(iterative, chainvel0)
+        epot1 = iterative.ff.compute(iterative.gpos,iterative.vtens)
+        ekin1 = iterative._compute_ekin()
+        self.econs_correction += epot0 - epot1 + ekin0 - ekin1
+
+    def post(self, iterative, chainvel0 = None):
+        iterative.gpos = np.zeros(iterative.pos.shape, float)
+        iterative.vtens = np.zeros((3,3),float)
+        epot0 = iterative.ff.compute(iterative.gpos,iterative.vtens)
+        ekin0 = iterative._compute_ekin()
+        self.baro(iterative, chainvel0)
+        epot1 = iterative.ff.compute(iterative.gpos,iterative.vtens)
+        ekin1 = iterative._compute_ekin()
+        self.econs_correction += epot0 - epot1 + ekin0 - ekin1
+
+    def baro(self, iterative, chainvel0):
+        def update_baro_vel():
+            # updates the barostat velocity tensor
+            # iL h/(8*tau)
+            self.vel_press *= np.exp(-self.timestep_press/(8*self.timecon))
+            if chainvel0 is not None:
+                # iL v_{xi} v_g h/8: extra contribution due to NHC thermostat
+                self.vel_press *= np.exp(-self.timestep_press*chainvel0/8)
+            # definition of P_intV and G
+            iterative.gpos = np.zeros(iterative.pos.shape, float)
+            iterative.vtens = np.zeros((3,3),float)
+            iterative.ekin = iterative._compute_ekin()
+            energy = iterative.ff.compute(iterative.gpos,iterative.vtens)
+            ptens_vol = np.dot(iterative.vel.T*iterative.masses, iterative.vel) - iterative.vtens
+            ptens_vol = 0.5*(ptens_vol.T + ptens_vol)
+            G = (ptens_vol+(2.0*iterative.ekin/self.ndof-self.press*iterative.ff.system.cell.volume)*np.eye(3))/self.mass_press
+            R = self.getR()
+            if not self.anisotropic:
+                G = np.trace(G)
+                R = R[0][0]
+            # iL (G_g-R_p/W) h/4
+            self.vel_press += (G-R/self.mass_press)*self.timestep_press/4
+            # iL h/(8*tau)
+            self.vel_press *= np.exp(-self.timestep_press/(8*self.timecon))
+            if chainvel0 is not None:
+                # iL v_{xi} v_g h/8: extra contribution due to NHC thermostat
+                self.vel_press *= np.exp(-self.timestep_press*chainvel0/8)
+
+        # first part of the barostat velocity tensor update
+        update_baro_vel()
+
+        # iL v_g h/2
+        if self.anisotropic:
+            Dr, Qg = np.linalg.eigh(self.vel_press)
+            Daccr = np.diagflat(np.exp(Dr*self.timestep_press/2))
+            rot_mat = np.dot(np.dot(Qg, Daccr), Qg.T)
+            pos_new = np.dot(iterative.pos, rot_mat)
+            rvecs_new = np.dot(iterative.rvecs, rot_mat)
+        else:
+            pos_new = np.exp(self.vel_press*self.timestep_press/2) * iterative.pos
+            rvecs_new = np.exp(self.vel_press*self.timestep_press/2) * iterative.rvecs
+        iterative.ff.update_pos(pos_new)
+        iterative.pos[:] = pos_new
+        iterative.ff.update_rvecs(rvecs_new)
+        iterative.rvecs[:] = rvecs_new
+
+        # -iL (v_g + Tr(v_g)/ndof) h/2
+        if self.anisotropic:
+            Dg, Eg = np.linalg.eigh(self.vel_press+(np.trace(self.vel_press)/self.ndof)*np.eye(3))
+            Bg = np.dot(Eg, np.diagflat(np.exp(-Dg*self.timestep_press/4)))
+            vel_new = np.dot(np.dot(iterative.vel, Bg), Bg.T)
+        else:
+            vel_new = np.exp(-((1.0+3.0/self.ndof)*self.vel_press)*self.timestep_press/2) * iterative.vel
+        iterative.vel[:] = vel_new
+
+        # second part of the barostat velocity tensor update
+        update_baro_vel()
+
+    def getR(self):
+        shape = 3, 3
+        # generate random 3x3 tensor
+        rand = np.random.normal(0, 1, shape)*np.sqrt(2*self.mass_press*boltzmann*self.temp/(self.timestep_press*self.timecon))
+        R = np.zeros(shape)
+        # create initial symmetric pressure velocity tensor
+        for i in xrange(3):
+            for j in xrange(3):
+                if i >= j:
+                    R[i,j] = rand[i,j]
+                else:
+                    R[i,j] = rand[j,i]
+        return R
+
+class MTKBarostat(VerletHook):
     def __init__(self, ff, temp, press, start=0, timecon=1000*femtosecond):
         """
             This hook implements the combination of the Nosé-Hoover chain thermostat

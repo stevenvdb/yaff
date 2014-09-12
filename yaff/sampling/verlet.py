@@ -182,59 +182,44 @@ class VerletIntegrator(Iterative):
         # Allow specialized hooks to modify the state before the regular verlet
         # step.
         self.call_verlet_hooks('pre')
-        from yaff.sampling.npt import MartynaTobiasKleinBarostat
-        if not any(isinstance(hook, MartynaTobiasKleinBarostat) for hook in self.hooks):
-            # Regular verlet step if not MTK barostat is present
-            self.delta[:] = self.timestep*self.vel + (0.5*self.timestep**2)*self.acc
-            self.pos += self.delta
-            self.ff.update_pos(self.pos)
-            self.gpos[:] = 0.0
-            self.vtens[:] = 0.0
-            self.epot = self.ff.compute(self.gpos, self.vtens)
-            acc = -self.gpos/self.masses.reshape(-1,1)
-            self.vel += 0.5*(acc+self.acc)*self.timestep
-            self.acc = acc
-        else:
-            for hook in self.hooks:
-                if isinstance(hook, MartynaTobiasKleinBarostat):
-                    # Modified Verlet step if MTK barostat is present
-                    # first velocity update
-                    self.vel += 0.5*self.acc*self.timestep
-                    # define matrices Dr, D'_r and Dv
-                    Dr, Qg = np.linalg.eigh(hook.vel_press)
-                    Dracc = np.diagflat(np.exp(Dr*self.timestep))
-                    Dr = np.diagflat(Dr)
-                    Dv = np.zeros((3,3))
-                    for i in xrange(3):
-                        arg = Dr[i][i]*self.timestep/2
-                        # exp times Mclaurin series of sinh (O(8))
-                        Dv[i][i] = np.exp(arg)*(1+arg**2/fact(3)+arg**4/fact(5)+arg**6/fact(7)+arg**8/fact(9)+arg**10/fact(11)+arg**12/fact(13)+arg**14/fact(15))
-                    # store old position for bookkeeping, and update positions
-                    pos_old = self.pos.copy()
-                    self.pos = np.dot(np.dot(np.dot(self.pos, Qg), Dracc) + self.timestep*np.dot(np.dot(self.vel,Qg),Dv), Qg.T)
-                    self.delta = self.pos - pos_old
-                    self.ff.update_pos(self.pos)
-                    # update cell tensor
-                    self.rvecs = np.dot(np.dot(np.dot(self.rvecs, Qg), Dracc), Qg.T)
-                    self.ff.update_rvecs(0.5*(self.rvecs+self.rvecs.T))
-                    self.rvecs = self.ff.system.cell.rvecs.copy()
-                    # recompute properties and forces for second part velocity update
-                    self.compute_properties()
-                    self.gpos[:] = 0.0
-                    self.vtens[:] = 0.0
-                    self.epot = self.ff.compute(self.gpos, self.vtens)
-                    self.acc = -self.gpos/self.masses.reshape(-1,1)
-                    self.vel += 0.5*self.acc*self.timestep
+        '''
+        # Regular verlet step
+        self.gpos[:] = 0.0
+        self.vtens[:] = 0.0
+        self.epot = self.ff.compute(self.gpos, self.vtens)
+        self.acc = -self.gpos/self.masses.reshape(-1,1)
+        self.vel += 0.5*self.acc*self.timestep
+        self.delta[:] = self.timestep*self.vel
+        self.pos += self.delta
+        self.ff.update_pos(self.pos)
+        self.gpos[:] = 0.0
+        self.vtens[:] = 0.0
+        self.epot = self.ff.compute(self.gpos, self.vtens)
+        self.acc = -self.gpos/self.masses.reshape(-1,1)
+        self.vel += 0.5*self.acc*self.timestep
+        '''
+
+        # Regular verlet step
+        self.delta[:] = self.timestep*self.vel + (0.5*self.timestep**2)*self.acc
+        self.pos += self.delta
+        self.ff.update_pos(self.pos)
+        self.gpos[:] = 0.0
+        self.vtens[:] = 0.0
+        self.epot = self.ff.compute(self.gpos, self.vtens)
+        acc = -self.gpos/self.masses.reshape(-1,1)
+        self.vel += 0.5*(acc+self.acc)*self.timestep
+        self.acc = acc
 
         # Allow specialized verlet hooks to modify the state after the step
         self.call_verlet_hooks('post')
-
+        '''
         self.posnieuw = self.pos.copy()
         self.delta[:] = self.posnieuw-self.posoud
         self.posoud[:] = self.posnieuw
         self.gpos[:] = 0.0
         self.vtens[:] = 0.0
         self.epot = self.ff.compute(self.gpos, self.vtens)
+        '''
 
         # Common post-processing of a single step
         self.time += self.timestep
