@@ -26,7 +26,6 @@ from yaff import *
 from yaff.sampling.test.common import get_ff_water32
 
 def test_amb():
-    pass
-    #nve = VerletIntegrator(get_ff_water32(), 1.0*femtosecond, hooks=AndersenMcDonaldBarostat(300, 1*bar))
-    #nve.run(5)
-    #assert nve.counter == 5
+    nve = VerletIntegrator(get_ff_water32(), 1.0*femtosecond, hooks=TBCombination(McDonaldBarostat(300, 1*bar), AndersenThermostat(300)))
+    nve.run(5)
+    assert nve.counter == 5
