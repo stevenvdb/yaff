@@ -65,9 +65,9 @@ class TBCombination(VerletHook):
             self.thermostat = barostat
             if not self.verify():
                 raise TypeError('The Thermostat or Barostat instance is not supported (yet)')
-        self.step_thermo = self.thermostat.step
+        self.stebaro_thermo = self.thermostat.step
         self.step_baro = self.barostat.step
-        VerletHook.__init__(self, start, min(self.step_thermo, self.step_baro))
+        VerletHook.__init__(self, start, min(self.stebaro_thermo, self.step_baro))
 
     def init(self, iterative):
         # initialize the thermostat and barostat separately
@@ -123,7 +123,7 @@ class TBCombination(VerletHook):
         # update the correction on E_cons due to thermostat and barostat
         self.econs_correction = self.thermostat.econs_correction + self.barostat.econs_correction
         if isinstance(self.thermostat, NHCThermostat):
-            if isinstance(self.barostat, MTKBarostat) and self.barostat.P_thermo is not None: pass
+            if isinstance(self.barostat, MTKBarostat) and self.barostat.baro_thermo is not None: pass
             else:
                 # extra correction necessary if particle NHC thermostat is used to thermostat the barostat
                 kt = boltzmann*self.thermostat.temp
@@ -133,7 +133,7 @@ class TBCombination(VerletHook):
     def expectscall(self, iterative, kind):
         # returns whether the thermostat/barostat should be called in this iteration
         if kind == 'thermo':
-            return iterative.counter >= self.start and (iterative.counter - self.start) % self.step_thermo == 0
+            return iterative.counter >= self.start and (iterative.counter - self.start) % self.stebaro_thermo == 0
         if kind == 'baro':
             return iterative.counter >= self.start and (iterative.counter - self.start) % self.step_baro == 0
 
@@ -149,6 +149,7 @@ class TBCombination(VerletHook):
         if any(isinstance(self.barostat, baro) for baro in baro_list):
             baro_correct = True
         return (thermo_correct and baro_correct)
+
 
 class McDonaldBarostat(VerletHook):
     def __init__(self, temp, press, start=0, step=1, amp=1e-3):
@@ -237,8 +238,9 @@ class McDonaldBarostat(VerletHook):
                     log('THERMO energy change %s' % log.energy(ekin0 - ekin1))
 
 
+
 class BerendsenBarostat(VerletHook):
-    def __init__(self, ff, temp, press, start=0, step=1, timecon=1000*femtosecond, beta = 4.57e-5/bar, anisotropic=True, Vconstraint = False):
+    def __init__(self, ff, temp, press, start=0, step=1, timecon=1000*femtosecond, beta=4.57e-5/bar, anisotropic=True, vol_constraint=False):
         """
             This hook implements the Berendsen barostat. The equations are derived in:
 
@@ -270,17 +272,17 @@ class BerendsenBarostat(VerletHook):
             anisotropic
                 Defines whether anisotropic cell fluctuations are allowed.
 
-            Vconstraint
+            vol_constraint
                 Defines whether the volume is allowed to fluctuate.
         """
         self.temp = temp
         self.press = press
         self.mass_press = 3.0*timecon/beta
         self.anisotropic = anisotropic
-        self.Vconstraint = Vconstraint
+        self.vol_constraint = vol_constraint
         self.dim = ff.system.cell.nvec
         # determine the number of degrees of freedom associated with the unit cell
-        self.baro_ndof = get_ndof_baro(self.dim, self.anisotropic, self.Vconstraint)
+        self.baro_ndof = get_ndof_baro(self.dim, self.anisotropic, self.vol_constraint)
         if self.anisotropic:
             # symmetrize the cell tensor
             cell_symmetrize(ff)
@@ -310,7 +312,7 @@ class BerendsenBarostat(VerletHook):
         ptens = (np.dot(iterative.vel.T*iterative.masses, iterative.vel) - iterative.vtens)/iterative.ff.system.cell.volume
         # determination of mu
         dmu = self.timestep_press/self.mass_press*(self.press*np.eye(3)-ptens)
-        if self.Vconstraint:
+        if self.vol_constraint:
             dmu -= np.trace(dmu)/self.dim*np.eye(self.dim)
         mu = np.eye(3) - dmu
         mu = 0.5*(mu+mu.T)
@@ -330,8 +332,9 @@ class BerendsenBarostat(VerletHook):
         epot1 = iterative.epot
         self.econs_correction += epot0 - epot1
 
+
 class LangevinBarostat(VerletHook):
-    def __init__(self, ff, temp, press, start=0, anisotropic = True, timecon=1000*femtosecond):
+    def __init__(self, ff, temp, press = 1e6, start=0, step=1, timecon=1000*femtosecond, anisotropic=True, vol_constraint=False):
         """
             This hook implements the Langevin barostat. The equations are derived in:
 
@@ -360,17 +363,17 @@ class LangevinBarostat(VerletHook):
             anisotropic
                 Defines whether anisotropic cell fluctuations are allowed.
 
-            Vconstraint
+            vol_constraint
                 Defines whether the volume is allowed to fluctuate.
         """
         self.temp = temp
         self.press = press
         self.timecon = timecon
         self.anisotropic = anisotropic
-        self.Vconstraint = Vconstraint
+        self.vol_constraint = vol_constraint
         self.dim = ff.system.cell.nvec
         # determine the number of degrees of freedom associated with the unit cell
-        self.baro_ndof = get_ndof_baro(self.dim, self.anisotropic, self.Vconstraint)
+        self.baro_ndof = get_ndof_baro(self.dim, self.anisotropic, self.vol_constraint)
         if self.anisotropic:
             # symmetrize the cell tensor
             cell_symmetrize(ff)
@@ -386,7 +389,7 @@ class LangevinBarostat(VerletHook):
         # define initial barostat velocity
         self.vel_press = get_random_vel_press(self.mass_press, self.temp)
         # make sure the volume of the cell will not change if applicable
-        if self.Vconstraint:
+        if self.vol_constraint:
             self.vel_press -= np.trace(self.vel_press)/3*np.eye(3)
         if not self.anisotropic:
             self.vel_press = self.vel_press[0][0]
@@ -432,7 +435,7 @@ class LangevinBarostat(VerletHook):
             ptens_vol = 0.5*(ptens_vol.T + ptens_vol)
             G = (ptens_vol+(2.0*iterative.ekin/self.ndof-self.press*iterative.ff.system.cell.volume)*np.eye(3))/self.mass_press
             R = self.getR()
-            if self.Vconstraint:
+            if self.vol_constraint:
                 G -= np.trace(G)/self.dim*np.eye(self.dim)
                 R -= np.trace(R)/self.dim*np.eye(self.dim)
             if not self.anisotropic:
@@ -474,7 +477,7 @@ class LangevinBarostat(VerletHook):
 
         # -iL (v_g + Tr(v_g)/ndof) h/2
         if self.anisotropic:
-            if self.Vconstraint:
+            if self.vol_constraint:
                 Dg, Eg = np.linalg.eigh(self.vel_press)
             else:
                 Dg, Eg = np.linalg.eigh(self.vel_press+(np.trace(self.vel_press)/self.ndof)*np.eye(3))
@@ -505,8 +508,9 @@ class LangevinBarostat(VerletHook):
                     R[i,j] = rand[j,i]
         return R
 
+
 class MTKBarostat(VerletHook):
-    def __init__(self, ff, temp, press = 1*atm, start=0, step=1, timecon=1000*femtosecond, anisotropic = True, Vconstraint = False, P_thermo = None):
+    def __init__(self, ff, temp, press=1*atm, start=0, step=1, timecon=1000*femtosecond, anisotropic=True, vol_constraint=False, baro_thermo=None):
         """
             This hook implements the combination of the Nosé-Hoover chain thermostat
             and the Martyna-Tobias-Klein barostat. The equations are derived in:
@@ -542,21 +546,21 @@ class MTKBarostat(VerletHook):
             anisotropic
                 Defines whether anisotropic cell fluctuations are allowed.
 
-            Vconstraint
+            vol_constraint
                 Defines whether the volume is allowed to fluctuate.
 
-            P_thermo
+            baro_thermo
                 NHCThermostat instance, coupled directly to the barostat
         """
         self.temp = temp
         self.press = press
         self.timecon_press = timecon
         self.anisotropic = anisotropic
-        self.Vconstraint = Vconstraint
-        self.P_thermo = P_thermo
+        self.vol_constraint = vol_constraint
+        self.baro_thermo = baro_thermo
         self.dim = ff.system.cell.nvec
         # determine the number of degrees of freedom associated with the unit cell
-        self.baro_ndof = get_ndof_baro(self.dim, self.anisotropic, self.Vconstraint)
+        self.baro_ndof = get_ndof_baro(self.dim, self.anisotropic, self.vol_constraint)
         if self.anisotropic:
             # symmetrize the cell tensor
             cell_symmetrize(ff)
@@ -572,11 +576,11 @@ class MTKBarostat(VerletHook):
         if not self.anisotropic:
             self.vel_press = self.vel_press[0][0]
         # initialize the barostat thermostat if present
-        if self.P_thermo is not None:
-            self.P_thermo.chain.timestep = iterative.timestep
-            self.P_thermo.chain.set_ndof(self.baro_ndof)
+        if self.baro_thermo is not None:
+            self.baro_thermo.chain.timestep = iterative.timestep
+            self.baro_thermo.chain.set_ndof(self.baro_ndof)
         # make sure the volume of the cell will not change if applicable
-        if self.Vconstraint:
+        if self.vol_constraint:
             self.vel_press -= np.trace(self.vel_press)/3*np.eye(3)
         # compute gpos and vtens, since they differ
         # after symmetrising the cell tensor
@@ -585,38 +589,38 @@ class MTKBarostat(VerletHook):
         iterative.epot = iterative.ff.compute(iterative.gpos,iterative.vtens)
 
     def pre(self, iterative, chainvel0 = None):
-        if self.P_thermo is not None:
+        if self.baro_thermo is not None:
             # overrule the chainvel0 argument in the TBC instance
-            chainvel0 = self.P_thermo.chain.vel[0]
+            chainvel0 = self.baro_thermo.chain.vel[0]
         # propagate the barostat
         self.baro(iterative, chainvel0)
         # propagate the barostat thermostat if present
-        if self.P_thermo is not None:
+        if self.baro_thermo is not None:
             # determine the barostat kinetic energy
             ekin_baro = self._compute_ekin_baro()
             # update the barostat thermostat, without updating v_g (done in self.baro)
             vel_press_copy = np.zeros(self.vel_press.shape)
             vel_press_copy[:] = self.vel_press
-            vel_baro, ekin_baro = self.P_thermo.chain(ekin_baro, vel_press_copy, 0)
+            vel_baro, ekin_baro = self.baro_thermo.chain(ekin_baro, vel_press_copy, 0)
 
     def post(self, iterative, chainvel0 = None):
         # propagate the barostat thermostat if present
-        if self.P_thermo is not None:
+        if self.baro_thermo is not None:
             # determine the barostat kinetic energy
             ekin_baro = self._compute_ekin_baro()
             # update the barostat thermostat, without updating v_g (done in self.baro)
             vel_press_copy = np.zeros(self.vel_press.shape)
             vel_press_copy[:] = self.vel_press
-            vel_baro, ekin_baro = self.P_thermo.chain(ekin_baro, vel_press_copy, 0)
+            vel_baro, ekin_baro = self.baro_thermo.chain(ekin_baro, vel_press_copy, 0)
             # overrule the chainvel0 argument in the TBC instance
-            chainvel0 = self.P_thermo.chain.vel[0]
+            chainvel0 = self.baro_thermo.chain.vel[0]
         # propagate the barostat
         self.baro(iterative, chainvel0)
         # calculate the correction due to the barostat alone
         self.econs_correction = self.press*iterative.ff.system.cell.volume + self._compute_ekin_baro()
-        if self.P_thermo is not None:
+        if self.baro_thermo is not None:
             # add the correction due to the barostat thermostat
-            self.econs_correction += self.P_thermo.chain.get_econs_correction()
+            self.econs_correction += self.baro_thermo.chain.get_econs_correction()
 
     def baro(self, iterative, chainvel0):
         def update_baro_vel():
@@ -630,7 +634,7 @@ class MTKBarostat(VerletHook):
             G = (ptens_vol+(2.0*iterative.ekin/self.ndof-self.press*iterative.ff.system.cell.volume)*np.eye(3))/self.mass_press
             if not self.anisotropic:
                 G = np.trace(G)
-            if self.Vconstraint:
+            if self.vol_constraint:
                 G -= np.trace(G)/self.dim*np.eye(self.dim)
             # iL G_g h/4
             self.vel_press += G*self.timestep_press/4
@@ -666,7 +670,7 @@ class MTKBarostat(VerletHook):
 
         # -iL (v_g + Tr(v_g)/ndof) h/2
         if self.anisotropic:
-            if self.Vconstraint:
+            if self.vol_constraint:
                 Dg, Eg = np.linalg.eigh(self.vel_press)
             else:
                 Dg, Eg = np.linalg.eigh(self.vel_press+(np.trace(self.vel_press)/self.ndof)*np.eye(3))
@@ -687,7 +691,7 @@ class MTKBarostat(VerletHook):
         kt = self.temp*boltzmann
         # pressure contribution to thermostat: kinetic cell tensor energy
         # and extra degrees of freedom due to cell tensor
-        if self.P_thermo is None:
+        if self.baro_thermo is None:
             return 2*self._compute_ekin_baro() - self.baro_ndof*kt
         else:
             # if a barostat thermostat is present, the thermostat is decoupled
