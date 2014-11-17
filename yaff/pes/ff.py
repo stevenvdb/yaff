@@ -424,11 +424,13 @@ class ForcePartEwaldReciprocalDD(ForcePart):
            alpha
                 The alpha parameter in the Ewald summation method.
 
-           dielectric
-                The scalar relative permittivity of the system.
+           **Optional arguments:**
 
            gcut
                 The cutoff in reciprocal space.
+
+           dielectric
+                The scalar relative permittivity of the system.
         '''
         ForcePart.__init__(self, 'ewald_reci', system)
         if not system.cell.nvec == 3:
@@ -439,8 +441,8 @@ class ForcePartEwaldReciprocalDD(ForcePart):
             raise ValueError('The system does not have dipoles.')
         self.system = system
         self.alpha = alpha
-        self.dielectric = dielectric
         self.gcut = gcut
+        self.dielectric = dielectric
         self.update_gmax()
         self.work = np.empty(system.natom*2)
         if log.do_medium:
@@ -547,9 +549,6 @@ class ForcePartEwaldCorrection(ForcePart):
 
            alpha
                 The alpha parameter in the Ewald summation method.
-
-           dielectric
-                The scalar relative permittivity of the system.
 
            scalings
                 A ``Scalings`` object. This object contains all the information

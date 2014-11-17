@@ -758,7 +758,7 @@ def test_pair_pot_ei_water32_dielectric():
     vtens0 = np.zeros((3, 3), float)
     energy0 = ff.compute(gpos0, vtens0)
     #Compute energy with epsilon=dielctric and original charges
-    pair_pot = PairPotEI(system.charges, alpha, dielectric, rcut)
+    pair_pot = PairPotEI(system.charges, alpha, rcut, dielectric=dielectric)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     ff = ForceField(system, [part_pair], nlist)
     ff.update_pos(system.pos)
