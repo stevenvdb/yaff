@@ -278,7 +278,7 @@ def get_part_water32_14A_ei(radii=None):
     # Create the pair_pot and part_pair
     rcut = 14*angstrom
     alpha = 5.5/rcut
-    pair_pot = PairPotEI(system.charges, alpha, dielectric, rcut, radii=radii)
+    pair_pot = PairPotEI(system.charges, alpha, rcut, dielectric=dielectric, radii=radii)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # The pair function
     def pair_fn(i, j, d, delta):
@@ -394,9 +394,9 @@ def get_part_water_eidip(scalings = [0.5,1.0,1.0],rcut=14.0*angstrom,switch_widt
     scalings = Scalings(system, scalings[0], scalings[1], scalings[2])
     # Create the pair_pot and part_pair
     if finite:
-        pair_pot = PairPotEI(system.charges,alpha, rcut, tr= Switch3(switch_width))
+        pair_pot = PairPotEI(system.charges,alpha, rcut, tr=Switch3(switch_width), radii=system.radii)
     else:
-        pair_pot = PairPotEIDip(system.charges, dipoles, alpha, rcut, tr = Switch3(switch_width))
+        pair_pot = PairPotEIDip(system.charges, dipoles, poltens_i, alpha, rcut, tr=Switch3(switch_width), radii=system.radii, radii2=system.radii2)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     nlist.update()
     #Make a different nlist in case we approximate the point dipoles with charges
@@ -550,7 +550,7 @@ def make_system_finite_dipoles(system, dipoles, eps=0.05*angstrom):
 
 
 def test_pair_pot_eidip_water_setdipoles():
-    '''Test if we can modify dipoles of PairPotEIDip object'''
+    # '''Test if we can modify dipoles of PairPotEIDip object'''
     #Setup simple system
     system = get_system_water()
     rcut = 50.0*angstrom
@@ -563,7 +563,7 @@ def test_pair_pot_eidip_water_setdipoles():
     poltens_i = np.tile( np.diag([1.0,1.0,1.0]) , np.array([system.natom, 1]) )
     system.dipoles = dipoles0
     #Initialize pair potential
-    pair_pot = PairPotEIDip(system.charges,system.dipoles,poltens_i,0.0,rcut)
+    pair_pot = PairPotEIDip(system.charges, system.dipoles, poltens_i, 0.0, rcut)
     #Check if dipoles are initialized correctly
     assert np.all( pair_pot.dipoles == dipoles0 )
     #Update the dipoles to new values
@@ -651,7 +651,7 @@ def test_pair_pot_ei_water32_dielectric():
     alpha = 5.5/rcut
     dielectric = 1.44
     #Compute energy with epsilon 1 and scaled charges
-    pair_pot = PairPotEI(system.charges/np.sqrt(dielectric), alpha, 1.0, rcut)
+    pair_pot = PairPotEI(system.charges/np.sqrt(dielectric), alpha, rcut)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     ff = ForceField(system, [part_pair], nlist)
     ff.update_pos(system.pos)
@@ -659,7 +659,7 @@ def test_pair_pot_ei_water32_dielectric():
     vtens0 = np.zeros((3, 3), float)
     energy0 = ff.compute(gpos0, vtens0)
     #Compute energy with epsilon=dielctric and original charges
-    pair_pot = PairPotEI(system.charges, alpha, dielectric, rcut)
+    pair_pot = PairPotEI(system.charges, alpha, rcut, dielectric=dielectric)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     ff = ForceField(system, [part_pair], nlist)
     ff.update_pos(system.pos)
@@ -982,7 +982,7 @@ def get_part_caffeine_ei1_10A():
     # Construct the pair potential and part
     rcut = 10*angstrom
     alpha = 3.5/rcut
-    pair_pot = PairPotEI(system.charges, alpha, dielectric, rcut)
+    pair_pot = PairPotEI(system.charges, alpha, rcut, dielectric=dielectric)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # The pair function
     def pair_fn(i, j, d):
@@ -1007,7 +1007,7 @@ def get_part_caffeine_ei2_10A():
     # Construct the pair potential and part
     rcut = 10*angstrom
     alpha = 0.0
-    pair_pot = PairPotEI(system.charges, alpha, dielectric, rcut)
+    pair_pot = PairPotEI(system.charges, alpha, rcut, dielectric=dielectric)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # The pair function
     def pair_fn(i, j, d):
