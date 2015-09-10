@@ -32,9 +32,9 @@
 double compute_ewald_reci(double *pos, long natom, double *charges,
                           cell_type* cell, double alpha, long *gmax, double
                           gcut, double dielectric, double *gpos, double *work,
-                          double* vtens) {
-  long g0, g1, g2, i;
-  double energy, k[3], ksq, cosfac, sinfac, x, c, s, fac1, fac2, dielectric_factor;
+                          double* vtens, double* hess) {
+  long g0, g1, g2, i, j;
+  double energy, k[3], ksq, cosfac, sinfac, x, c, s, h, fac1, fac2, dielectric_factor;
   double kvecs[9];
   for (i=0; i<9; i++) {
     kvecs[i] = M_TWO_PI*(*cell).gvecs[i];
@@ -98,6 +98,56 @@ double compute_ewald_reci(double *pos, long natom, double *charges,
           vtens[5] += x;
           vtens[7] += x;
         }
+        if (hess != NULL) {
+          /*
+          Contributions to all hessian elements are proportional to:
+            q_i*q_j*(sin(k.r_i)*sin(k.r_j) + cos(k.r_i)*cos(k.r_j))
+            - \delta_{i,j}*( \sum_n q_n*cos(k.r_n)*q_i*cos(k.r_i) + \sum_n q_n*sin(k.r_n)*q_i*sin(k.r_i) )
+          Such terms have to be multiplied by a prefactor and by the appropriate components of k
+          */
+          c = 2.0*fac1*exp(-ksq*fac2)/ksq;
+          for (i=0; i<natom; i++) {
+            for (j=i+1; j<natom; j++) {
+              x = (work[2*i+1]*work[2*j+1]+work[2*i]*work[2*j])*c;
+              s = x*k[0];
+              h = s*k[0];
+              hess[9*natom*i+3*j            ] += h;
+              hess[9*natom*j+3*i            ] += h;
+              h = s*k[1];
+              hess[9*natom*i+3*j+1          ] += h;
+              hess[9*natom*j+3*i+1          ] += h;
+              hess[9*natom*i+3*j+    3*natom] += h;
+              hess[9*natom*j+3*i+    3*natom] += h;
+              h = s*k[2];
+              hess[9*natom*i+3*j+2          ] += h;
+              hess[9*natom*j+3*i+2          ] += h;
+              hess[9*natom*i+3*j+    6*natom] += h;
+              hess[9*natom*j+3*i+    6*natom] += h;
+              s = x*k[1];
+              h = s*k[1];
+              hess[9*natom*i+3*j+1+  3*natom] += h;
+              hess[9*natom*j+3*i+1+  3*natom] += h;
+              h = s*k[2];
+              hess[9*natom*i+3*j+2+  3*natom] += h;
+              hess[9*natom*i+3*j+1+  6*natom] += h;
+              hess[9*natom*j+3*i+2+  3*natom] += h;
+              hess[9*natom*j+3*i+1+  6*natom] += h;
+              h = x*k[2]*k[2];
+              hess[9*natom*i+3*j+2+  6*natom] += h;
+              hess[9*natom*j+3*i+2+  6*natom] += h;
+            }
+            x = (work[2*i+1]*work[2*i+1]+work[2*i]*work[2*i])*c - (cosfac*work[2*i]-sinfac*work[2*i+1]);
+            hess[9*natom*i+3*i+0] += x*k[0]*k[0];
+            hess[9*natom*i+3*i+1] += x*k[0]*k[1];
+            hess[9*natom*i+3*i+2] += x*k[0]*k[2];
+            hess[9*natom*i+3*i+0+3*natom] += x*k[1]*k[0];
+            hess[9*natom*i+3*i+1+3*natom] += x*k[1]*k[1];
+            hess[9*natom*i+3*i+2+3*natom] += x*k[1]*k[2];
+            hess[9*natom*i+3*i+0+6*natom] += x*k[2]*k[0];
+            hess[9*natom*i+3*i+1+6*natom] += x*k[2]*k[1];
+            hess[9*natom*i+3*i+2+6*natom] += x*k[2]*k[2];
+          }
+        }
       }
     }
   }
@@ -116,6 +166,11 @@ double compute_ewald_reci(double *pos, long natom, double *charges,
   if (vtens != NULL) {
     for (i=0; i<9; i++) {
     vtens[i] *= dielectric_factor;
+    }
+  }
+  if (hess != NULL) {
+    for (i=0; i<(3*natom*3*natom); i++) {
+      hess[i] *= dielectric_factor;
     }
   }
   energy *= dielectric_factor;
@@ -312,12 +367,14 @@ double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *d
 double compute_ewald_corr(double *pos, double *charges,
                           cell_type *unitcell, double alpha,
                           scaling_row_type *stab, long nstab, double dielectric,
-                          double *gpos, double *vtens, long natom) {
-  long i, center_index, other_index;
-  double energy, delta[3], d, x, g, pot, fac, dielectric_factor;
+                          double *gpos, double *vtens, double *hess, long natom) {
+  long i, center_index, other_index, hsize;
+  double energy, delta[3], d, x, g, gg, pot, fac, dielectric_factor, rmin2, h, hh;
   energy = 0.0;
   g = 0.0;
-  // Self-interaction correction (no gpos or vtens contribution)
+  gg = 0.0;
+  hsize = 3*natom;
+  // Self-interaction correction (no gpos or vtens or hess contribution)
   x = alpha/M_SQRT_PI;
   for (i = 0; i < natom; i++) {
     energy -= x*charges[i]*charges[i];
@@ -335,7 +392,11 @@ double compute_ewald_corr(double *pos, double *charges,
     pot = erf(x)/d;
     fac = (1-stab[i].scale)*charges[other_index]*charges[center_index];
     if ((gpos != NULL) || (vtens != NULL)) {
-      g = -fac*(M_TWO_DIV_SQRT_PI*alpha*exp(-x*x) - pot)/d/d;
+      rmin2 = 1.0/(d*d);
+      g = -fac*(M_TWO_DIV_SQRT_PI*alpha*exp(-x*x) - pot)*rmin2;
+      if (hess != NULL) {
+        gg = -fac*(pot-M_TWO_DIV_SQRT_PI*alpha*(1.0+x*x)*exp(-x*x))*2.0*rmin2*rmin2;
+      }
     }
     if (gpos != NULL) {
       x = delta[0]*g;
@@ -362,6 +423,61 @@ double compute_ewald_corr(double *pos, double *charges,
       vtens[5] += x;
       vtens[7] += x;
     }
+    if (hess != NULL) {
+        h = gg*delta[0];
+        // x-x entries
+        hh = h*delta[0] + g*(1.0-delta[0]*delta[0]*rmin2);
+        hess[3*center_index*hsize+3*center_index+    0] += hh;
+        hess[3*other_index*hsize +3*other_index +    0] += hh;
+        hess[3*center_index*hsize+3*other_index +    0] -= hh;
+        hess[3*other_index*hsize +3*center_index+    0] -= hh;
+        // x-y and y-x entries
+        hh = h*delta[1] - g*delta[0]*delta[1]*rmin2;
+        hess[3*center_index*hsize+3*center_index+    1] += hh;
+        hess[3*center_index*hsize+3*center_index+hsize] += hh;
+        hess[3*other_index*hsize +3*other_index +    1] += hh;
+        hess[3*other_index*hsize +3*other_index +hsize] += hh;
+        hess[3*center_index*hsize+3*other_index +    1] -= hh;
+        hess[3*center_index*hsize+3*other_index +hsize] -= hh;
+        hess[3*other_index*hsize +3*center_index+    1] -= hh;
+        hess[3*other_index*hsize +3*center_index+hsize] -= hh;
+
+        h = gg*delta[1];
+        // y-y entries
+        hh = h*delta[1] + g*(1.0-delta[1]*delta[1]*rmin2);
+        hess[3*center_index*hsize+3*center_index+hsize+1] += hh;
+        hess[3*other_index*hsize +3*other_index +hsize+1] += hh;
+        hess[3*center_index*hsize+3*other_index +hsize+1] -= hh;
+        hess[3*other_index*hsize +3*center_index+hsize+1] -= hh;
+        // y-z and z-y entries
+        hh = h*delta[2] - g*delta[1]*delta[2]*rmin2;
+        hess[3*center_index*hsize+3*center_index+hsize+2] += hh;
+        hess[3*center_index*hsize+3*center_index+2*hsize+1] += hh;
+        hess[3*other_index*hsize +3*other_index +hsize+2] += hh;
+        hess[3*other_index*hsize +3*other_index +2*hsize+1] += hh;
+        hess[3*center_index*hsize+3*other_index +hsize+2] -= hh;
+        hess[3*center_index*hsize+3*other_index +2*hsize+1] -= hh;
+        hess[3*other_index*hsize +3*center_index+hsize+2] -= hh;
+        hess[3*other_index*hsize +3*center_index+2*hsize+1] -= hh;
+
+        h = gg*delta[2];
+        // z-z entries
+        hh = h*delta[2] + g*(1.0-delta[2]*delta[2]*rmin2);
+        hess[3*center_index*hsize+3*center_index+2*hsize+2] += hh;
+        hess[3*other_index*hsize +3*other_index +2*hsize+2] += hh;
+        hess[3*center_index*hsize+3*other_index +2*hsize+2] -= hh;
+        hess[3*other_index*hsize +3*center_index+2*hsize+2] -= hh;
+        // x-z and x-z entries
+        hh = h*delta[0] - g*delta[2]*delta[0]*rmin2;
+        hess[3*center_index*hsize+3*center_index+    2] += hh;
+        hess[3*center_index*hsize+3*center_index+2*hsize] += hh;
+        hess[3*other_index*hsize +3*other_index +    2] += hh;
+        hess[3*other_index*hsize +3*other_index +2*hsize] += hh;
+        hess[3*center_index*hsize+3*other_index +    2] -= hh;
+        hess[3*center_index*hsize+3*other_index +2*hsize] -= hh;
+        hess[3*other_index*hsize +3*center_index+    2] -= hh;
+        hess[3*other_index*hsize +3*center_index+2*hsize] -= hh;
+    }
     energy -= fac*pot;
   }
   //Corrections for dielectric constant
@@ -374,6 +490,11 @@ double compute_ewald_corr(double *pos, double *charges,
   if (vtens != NULL) {
     for (i=0; i<9; i++) {
     vtens[i] *= dielectric_factor;
+    }
+  }
+  if (hess != NULL) {
+    for (i=0; i<(3*natom*3*natom); i++) {
+      hess[i] *= dielectric_factor;
     }
   }
   energy *= dielectric_factor;

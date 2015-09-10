@@ -30,7 +30,7 @@
 #include "slater.h"
 
 
-typedef double (*pair_fn_type)(void*, long, long, double, double*, double*, double*);
+typedef double (*pair_fn_type)(void*, long, long, double, double*, double*, double*, double*);
 
 typedef struct {
   void *pair_data;
@@ -57,7 +57,7 @@ void pair_data_free(pair_pot_type *pair_pot);
 double pair_pot_compute(neigh_row_type *neighs,
                         long nneigh, scaling_row_type *scaling,
                         long scaling_size, pair_pot_type *pair_pot,
-                        double *gpos, double* vtens);
+                        double *gpos, double* vtens, double* hess, long hsize);
 
 
 typedef struct {
@@ -66,7 +66,7 @@ typedef struct {
 } pair_data_lj_type;
 
 void pair_data_lj_init(pair_pot_type *pair_pot, double *sigma, double *epsilon);
-double pair_fn_lj(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *g_cart);
+double pair_fn_lj(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *gg, double *g_cart);
 
 
 typedef struct {
@@ -76,7 +76,7 @@ typedef struct {
 } pair_data_mm3_type;
 
 void pair_data_mm3_init(pair_pot_type *pair_pot, double *sigma, double *epsilon, int *onlypauli);
-double pair_fn_mm3(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *g_cart);
+double pair_fn_mm3(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *gg, double *g_cart);
 
 
 typedef struct {
@@ -85,7 +85,7 @@ typedef struct {
 } pair_data_grimme_type;
 
 void pair_data_grimme_init(pair_pot_type *pair_pot, double *r0, double *c6);
-double pair_fn_grimme(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *g_cart);
+double pair_fn_grimme(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *gg, double *g_cart);
 
 
 typedef struct {
@@ -96,8 +96,6 @@ typedef struct {
 } pair_data_exprep_type;
 
 void pair_data_exprep_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *amp_cross, double *b_cross);
-double pair_fn_exprep(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *g_cart);
-
 
 typedef struct {
   long nffatype;
@@ -107,7 +105,8 @@ typedef struct {
 } pair_data_ljcross_type;
 
 void pair_data_ljcross_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *eps_cross, double *sig_cross);
-double pair_fn_ljcross(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *g_cart);
+double pair_fn_ljcross(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *gg, double *g_cart);
+double pair_fn_exprep(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *gg, double *g_cart);
 
 
 typedef struct {
@@ -129,7 +128,6 @@ typedef struct {
 } pair_data_dampdisp_type;
 
 void pair_data_dampdisp_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *c6_cross, double *b_cross);
-double pair_fn_dampdisp(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *g_cart);
 
 
 typedef struct {
@@ -150,6 +148,7 @@ double pair_data_disp68bjdamp_get_c6_scale(pair_pot_type *pair_pot);
 double pair_data_disp68bjdamp_get_c8_scale(pair_pot_type *pair_pot);
 double pair_data_disp68bjdamp_get_bj_a(pair_pot_type *pair_pot);
 double pair_data_disp68bjdamp_get_bj_b(pair_pot_type *pair_pot);
+double pair_fn_dampdisp(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *gg, double *g_cart);
 
 
 typedef struct {
@@ -180,7 +179,7 @@ typedef struct {
 } pair_data_ei_type;
 
 void pair_data_ei_init(pair_pot_type *pair_pot, double *charges, double alpha, double dielectric, double *radii);
-double pair_fn_ei(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *g_cart);
+double pair_fn_ei(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *gg, double *g_cart);
 double pair_data_ei_get_alpha(pair_pot_type *pair_pot);
 double pair_data_ei_get_dielectric(pair_pot_type *pair_pot);
 
@@ -194,7 +193,7 @@ typedef struct {
 } pair_data_eidip_type;
 
 void pair_data_eidip_init(pair_pot_type *pair_pot, double *charges, double *dipoles, double alpha, double *radii, double *radii2);
-double pair_fn_eidip(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *g_cart);
+double pair_fn_eidip(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *gg, double *g_cart);
 double pair_data_eidip_get_alpha(pair_pot_type *pair_pot);
 
 

@@ -26,7 +26,7 @@
 #define YAFF_TRUNCATION_H
 
 
-typedef double (*trunc_fn_type)(double, double, double, double*);
+typedef double (*trunc_fn_type)(double, double, double, double*, double*);
 
 typedef struct {
   trunc_fn_type trunc_fn;
@@ -39,7 +39,7 @@ double hammer_get_tau(trunc_scheme_type *trunc_scheme);
 trunc_scheme_type* switch3_new(double width);
 double switch3_get_width(trunc_scheme_type *trunc_scheme);
 
-double trunc_scheme_fn(trunc_scheme_type *trunc_scheme, double d, double rcut, double *g);
+double trunc_scheme_fn(trunc_scheme_type *trunc_scheme, double d, double rcut, double *g, double *gg);
 void trunc_scheme_free(trunc_scheme_type *trunc_scheme);
 
 

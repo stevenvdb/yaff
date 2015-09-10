@@ -78,6 +78,8 @@ class ForcePart(object):
         self.energy = 0.0
         self.gpos = np.zeros((system.natom, 3), float)
         self.vtens = np.zeros((3, 3), float)
+        # avoid constructing an empty hessian, do it only if hessian is requested first time
+        self.hess = None
         self.clear()
 
     def clear(self):
@@ -87,6 +89,7 @@ class ForcePart(object):
         self.energy = np.nan
         self.gpos[:] = np.nan
         self.vtens[:] = np.nan
+        if self.hess is not None: self.hess[:] = np.nan
 
     def update_rvecs(self, rvecs):
         '''Let the ``ForcePart`` object know that the cell vectors have changed.
@@ -108,7 +111,7 @@ class ForcePart(object):
         '''
         self.clear()
 
-    def compute(self, gpos=None, vtens=None):
+    def compute(self, gpos=None, vtens=None, hess=None):
         """Compute the energy and optionally some derivatives for this FF (part)
 
            The only variable inputs for the compute routine are the atomic
@@ -134,6 +137,10 @@ class ForcePart(object):
                 for tensor.) This must be a writeable numpy array with shape (3,
                 3).
 
+           hess
+                The second derivatives of the energy towards the Cartesian
+                coordinates
+
            The energy is returned. The optional arguments are Fortran-style
            output arguments. When they are present, the corresponding results
            are computed and **added** to the current contents of the array.
@@ -148,7 +155,19 @@ class ForcePart(object):
         else:
             my_vtens = self.vtens
             my_vtens[:] = 0.0
-        self.energy = self._internal_compute(my_gpos, my_vtens)
+        if hess is None:
+            my_hess = None
+        else:
+            # Check if hessian has been constructed before; if not, initialize now
+            if self.hess is None: self.hess = np.zeros((np.prod(self.gpos.shape), np.prod(self.gpos.shape)), float)
+            my_hess = self.hess
+            my_hess[:] = 0.0
+            # Hessian computation relies on gpos calculation, so calculate gpos
+            # even if user did not request it explicitly.
+            if gpos is None:
+                my_gpos = self.gpos
+                my_gpos[:] = 0.0
+        self.energy = self._internal_compute(my_gpos, my_vtens, my_hess)
         if np.isnan(self.energy):
             raise ValueError('The energy is not-a-number (nan).')
         if gpos is not None:
@@ -159,6 +178,10 @@ class ForcePart(object):
             if np.isnan(my_vtens).any():
                 raise ValueError('Some vtens element(s) is/are not-a-number (nan).')
             vtens += my_vtens
+        if hess is not None:
+            if np.isnan(my_hess).any():
+                raise ValueError('Some hess element(s) is/are not-a-number (nan).')
+            hess += my_hess
         return self.energy
 
     def _internal_compute(self, gpos, vtens):
@@ -259,11 +282,11 @@ class ForceField(ForcePart):
         if self.nlist is not None:
             self.needs_nlist_update = True
 
-    def _internal_compute(self, gpos, vtens):
+    def _internal_compute(self, gpos, vtens, hess):
         if self.needs_nlist_update:
             self.nlist.update()
             self.needs_nlist_update = False
-        result = sum([part.compute(gpos, vtens) for part in self.parts])
+        result = sum([part.compute(gpos, vtens, hess) for part in self.parts])
         return result
 
 
@@ -317,9 +340,9 @@ class ForcePartPair(ForcePart):
                 self.pair_pot.log()
                 log.hline()
 
-    def _internal_compute(self, gpos, vtens):
+    def _internal_compute(self, gpos, vtens, hess):
         with timer.section('PP %s' % self.pair_pot.name):
-            return self.pair_pot.compute(self.nlist.neighs, self.scalings.stab, gpos, vtens, self.nlist.nneigh)
+            return self.pair_pot.compute(self.nlist.neighs, self.scalings.stab, gpos, vtens, hess, self.nlist.nneigh)
 
 
 class ForcePartEwaldReciprocal(ForcePart):
@@ -377,11 +400,13 @@ class ForcePartEwaldReciprocal(ForcePart):
         ForcePart.update_rvecs(self, rvecs)
         self.update_gmax()
 
-    def _internal_compute(self, gpos, vtens):
+    def _internal_compute(self, gpos, vtens, hess):
         with timer.section('Ewald reci.'):
+            #if hess is not None:
+            #    raise NotImplementedError('Hessian computation not implemented for ForcePartEwaldReciprocal')
             return compute_ewald_reci(
                 self.system.pos, self.system.charges, self.system.cell, self.alpha,
-                self.gmax, self.gcut, self.dielectric, gpos, self.work, vtens
+                self.gmax, self.gcut, self.dielectric, gpos, self.work, vtens, hess
             )
 
 
@@ -435,8 +460,10 @@ class ForcePartEwaldReciprocalDD(ForcePart):
         ForcePart.update_rvecs(self, rvecs)
         self.update_gmax()
 
-    def _internal_compute(self, gpos, vtens):
+    def _internal_compute(self, gpos, vtens, hess):
         with timer.section('Ewald reci.'):
+            if hess is not None:
+                raise NotImplementedError('Hessian computation not implemented for ForcePartEwaldReciprocalDD')
             return compute_ewald_reci_dd(
                 self.system.pos, self.system.charges, self.system.dipoles, self.system.cell, self.alpha,
                 self.gmax, self.gcut, gpos, self.work, vtens
@@ -488,11 +515,11 @@ class ForcePartEwaldCorrection(ForcePart):
                 log('  scalings:          %5.3f %5.3f %5.3f' % (scalings.scale1, scalings.scale2, scalings.scale3))
                 log.hline()
 
-    def _internal_compute(self, gpos, vtens):
+    def _internal_compute(self, gpos, vtens, hess):
         with timer.section('Ewald corr.'):
             return compute_ewald_corr(
                 self.system.pos, self.system.charges, self.system.cell,
-                self.alpha, self.scalings.stab, self.dielectric, gpos, vtens
+                self.alpha, self.scalings.stab, self.dielectric, gpos, vtens, hess
             )
 
 
@@ -534,8 +561,10 @@ class ForcePartEwaldCorrectionDD(ForcePart):
                 log('  scalings:          %5.3f %5.3f %5.3f' % (scalings.scale1, scalings.scale2, scalings.scale3))
                 log.hline()
 
-    def _internal_compute(self, gpos, vtens):
+    def _internal_compute(self, gpos, vtens, hess):
         with timer.section('Ewald corr.'):
+            if hess is not None:
+                raise NotImplementedError('Hessian computation not implemented for ForcePartEwaldCorrectionDD')
             return compute_ewald_corr_dd(
                 self.system.pos, self.system.charges, self.system.dipoles, self.system.cell,
                 self.alpha, self.scalings.stab, gpos, vtens
@@ -578,8 +607,10 @@ class ForcePartEwaldNeutralizing(ForcePart):
                 log('  relative permittivity:   %5.3f' % self.dielectric)
                 log.hline()
 
-    def _internal_compute(self, gpos, vtens):
+    def _internal_compute(self, gpos, vtens, hess):
         with timer.section('Ewald neut.'):
+            if hess is not None:
+                raise NotImplementedError('Hessian computation not implemented for ForcePartEwaldNeutralizing')
             #TODO: interaction of dipoles with background? I think this is zero, need proof...
             fac = self.system.charges.sum()**2*np.pi/(2.0*self.system.cell.volume*self.alpha**2)/self.dielectric
             if self.system.radii is not None:
@@ -688,8 +719,10 @@ class ForcePartValence(ForcePart):
                 log('%7i&%s %s' % (self.vlist.nv, term.get_log(), ' '.join(ic.get_log() for ic in term.ics)))
         self.vlist.add_term(term)
 
-    def _internal_compute(self, gpos, vtens):
+    def _internal_compute(self, gpos, vtens, hess):
         with timer.section('Valence'):
+            if hess is not None:
+                raise NotImplementedError('Hessian computation not implemented for ForcePartValence')
             self.dlist.forward()
             self.iclist.forward()
             energy = self.vlist.forward()
@@ -726,8 +759,10 @@ class ForcePartPressure(ForcePart):
                 log('Force part: %s' % self.name)
                 log.hline()
 
-    def _internal_compute(self, gpos, vtens):
+    def _internal_compute(self, gpos, vtens, hess):
         with timer.section('Valence'):
+            if hess is not None:
+                raise NotImplementedError('Hessian computation not implemented for ForcePartPressure')
             cell = self.system.cell
             if (vtens is not None):
                 rvecs = cell.rvecs
@@ -776,12 +811,14 @@ class ForcePartGrid(ForcePart):
                 log('Force part: %s' % self.name)
                 log.hline()
 
-    def _internal_compute(self, gpos, vtens):
+    def _internal_compute(self, gpos, vtens, hess):
         with timer.section('Grid'):
             if gpos is not None:
                 raise NotImplementedError('Cartesian gradients are not supported yet in ForcePartGrid')
             if vtens is not None:
                 raise NotImplementedError('Cell deformation are not supported by ForcePartGrid')
+            if hess is not None:
+                raise NotImplementedError('Hessian computation not implemented for ForcePartGrid')
             cell = self.system.cell
             result = 0
             for i in xrange(self.system.natom):

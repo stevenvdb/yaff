@@ -28,7 +28,7 @@ import numpy as np
 from yaff import *
 
 from yaff.test.common import get_system_water32, get_system_quartz
-from yaff.pes.test.common import check_gpos_part, check_vtens_part
+from yaff.pes.test.common import check_gpos_part, check_vtens_part, check_hess_part
 
 
 def test_ewald_water32():
@@ -70,19 +70,23 @@ def check_alpha_depedence(system):
     energies = []
     gposs = []
     vtenss = []
+    hesss = []
     assert abs(system.charges.sum()) < 1e-10
     for alpha in 0.05, 0.1, 0.2, 0.5, 1.0:
-        energy, gpos, vtens = get_electrostatic_energy(alpha, system)
+        energy, gpos, vtens, hess = get_electrostatic_energy(alpha, system)
         energies.append(energy)
         gposs.append(gpos)
         vtenss.append(vtens)
+        hesss.append(hess)
     energies = np.array(energies)
     gposs = np.array(gposs)
     vtenss = np.array(vtenss)
+    hesss = np.array(hesss)
     print energies
     assert abs(energies - energies.mean()).max() < 1e-8
     assert abs(gposs - gposs.mean(axis=0)).max() < 1e-8
     assert abs(vtenss - vtenss.mean(axis=0)).max() < 1e-8
+    assert abs(hesss - hesss.mean(axis=0)).max() < 1e-8
 
 
 def check_dielectric(system):
@@ -96,13 +100,13 @@ def check_dielectric(system):
     dielectric = 1.44
     # Use scaled charges and epsilon=1
     system.charges = original_charges/np.sqrt(dielectric)
-    energy, gpos, vtens = get_electrostatic_energy(0.2, system)
+    energy, gpos, vtens, hess = get_electrostatic_energy(0.2, system)
     energies.append(energy)
     gposs.append(gpos)
     vtenss.append(vtens)
     # Use original charges and epsilon=dielectric
     system.charges = original_charges
-    energy, gpos, vtens = get_electrostatic_energy(0.2, system, dielectric=dielectric)
+    energy, gpos, vtens, hess = get_electrostatic_energy(0.2, system, dielectric=dielectric)
     energies.append(energy)
     gposs.append(gpos)
     vtenss.append(vtens)
@@ -133,9 +137,10 @@ def get_electrostatic_energy(alpha, system, dielectric=1.0):
     ff.update_rvecs(system.cell.rvecs)
     gpos = np.zeros(system.pos.shape, float)
     vtens = np.zeros((3, 3), float)
-    energy = ff.compute(gpos, vtens)
+    hess = np.zeros((np.prod(system.pos.shape),np.prod(system.pos.shape)), float)
+    energy = ff.compute(gpos, vtens, hess)
     print '    # %4.2f' % alpha, ' '.join('%15.7e' % part.energy for part in ff.parts)
-    return energy, gpos, vtens
+    return energy, gpos, vtens, hess
 
 
 def check_alpha_dependence_dd(system):
@@ -191,6 +196,7 @@ def test_ewald_gpos_vtens_reci_water32():
         part_ewald_reci = ForcePartEwaldReciprocal(system, alpha, gcut=alpha/0.75, dielectric=dielectric)
         check_gpos_part(system, part_ewald_reci)
         check_vtens_part(system, part_ewald_reci)
+        check_hess_part(system, part_ewald_reci)
 
 
 def test_ewald_gpos_vtens_reci_quartz():
@@ -199,6 +205,7 @@ def test_ewald_gpos_vtens_reci_quartz():
         part_ewald_reci = ForcePartEwaldReciprocal(system, alpha, gcut=alpha/0.5)
         check_gpos_part(system, part_ewald_reci)
         check_vtens_part(system, part_ewald_reci)
+        check_hess_part(system, part_ewald_reci)
 
 
 def test_ewald_reci_volchange_quartz():
@@ -248,6 +255,7 @@ def test_ewald_gpos_vtens_corr_water32():
         part_ewald_corr = ForcePartEwaldCorrection(system, alpha, scalings, dielectric=0.8)
         check_gpos_part(system, part_ewald_corr)
         check_vtens_part(system, part_ewald_corr)
+        check_hess_part(system, part_ewald_corr)
 
 
 def test_ewald_gpos_vtens_corr_quartz():
@@ -257,6 +265,7 @@ def test_ewald_gpos_vtens_corr_quartz():
         part_ewald_corr = ForcePartEwaldCorrection(system, alpha, scalings)
         check_gpos_part(system, part_ewald_corr)
         check_vtens_part(system, part_ewald_corr)
+        check_hess_part(system, part_ewald_corr)
 
 
 def test_ewald_vtens_neut_water32():

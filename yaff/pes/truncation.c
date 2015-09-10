@@ -27,15 +27,17 @@
 #include <stdlib.h>
 
 
-double hammer(double d, double rcut, double tau, double *g) {
+double hammer(double d, double rcut, double tau, double *g, double *gg) {
   double result, x;
   if (d < rcut) {
     x = d - rcut;
     result = exp(tau/x);
     if (g != NULL) *g = -result*tau/x/x;
+    if (gg != NULL) *gg = (2+tau/x)*tau*result/x/x/x;
   } else {
     result = 0.0;
     if (g != NULL) *g = 0.0;
+    if (g != NULL) *gg = 0.0;
   }
   return result;
 }
@@ -56,21 +58,24 @@ double hammer_get_tau(trunc_scheme_type *trunc_scheme) {
 
 
 
-double switch3(double d, double rcut, double width, double *g) {
+double switch3(double d, double rcut, double width, double *g, double *gg) {
   double result, x;
   if (d < rcut) {
     x = rcut - d;
     if (x > width) {
       result = 1.0;
       if (g != NULL) *g = 0.0;
+      if (gg != NULL) *gg = 0.0;
     } else {
       x /= width;
       result = (3 - 2*x)*x*x;
       if (g != NULL) *g = -6*x*(1-x)/width;
+      if (gg != NULL) *gg = 6*(1-2*x)/width/width;
     }
   } else {
     result = 0.0;
     if (g != NULL) *g = 0.0;
+    if (gg != NULL) *gg = 0.0;
   }
   return result;
 }
@@ -90,8 +95,8 @@ double switch3_get_width(trunc_scheme_type *trunc_scheme){
 }
 
 
-double trunc_scheme_fn(trunc_scheme_type *trunc_scheme, double d, double rcut, double *g) {
-  return (*trunc_scheme).trunc_fn(d, rcut, (*trunc_scheme).par, g);
+double trunc_scheme_fn(trunc_scheme_type *trunc_scheme, double d, double rcut, double *g, double *gg) {
+  return (*trunc_scheme).trunc_fn(d, rcut, (*trunc_scheme).par, g, gg);
 }
 
 void trunc_scheme_free(trunc_scheme_type *trunc_scheme) {

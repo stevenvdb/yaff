@@ -33,6 +33,8 @@ from yaff.test.common import get_system_water32, get_system_caffeine, \
     get_system_2atoms, get_system_quartz, get_system_4113_01WaterWater, \
     get_system_water
 from yaff.pes.test.common import check_gpos_part, check_vtens_part
+    get_system_2atoms, get_system_quartz, get_system_water
+from yaff.pes.test.common import check_gpos_part, check_vtens_part, check_hess_part
 
 from yaff import *
 
@@ -1047,6 +1049,32 @@ def test_pair_pot_ei3_caffeine_10A():
     check_pair_pot_caffeine(system, nlist, scalings, part_pair, pair_fn, 1e-9)
 
 
+def get_part_caffeine_ei4_10A():
+    # Get a system and define scalings
+    system = get_system_caffeine()
+    nlist = NeighborList(system)
+    scalings = Scalings(system, 0.0, 1.0, 0.5)
+    # Initialize (random) parameters
+    system.charges = np.random.uniform(0, 1, system.natom)
+    system.charges -= system.charges.sum()
+    #Set the atomic radii
+    radii = np.random.uniform(0,1,system.natom)
+    # Construct the pair potential and part
+    rcut = 10*angstrom
+    alpha = 3.5/rcut
+    pair_pot = PairPotEI(system.charges, alpha, rcut, radii=radii)
+    part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
+    # The pair function
+    def pair_fn(i, j, d):
+        r_ij = np.sqrt( pair_pot.radii[i]**2 + pair_pot.radii[j]**2 )
+        return system.charges[i]*system.charges[j]*(erfc(alpha*d)-erfc(d/r_ij))/d
+    return system, nlist, scalings, part_pair, pair_fn
+
+
+def test_pair_pot_ei4_caffeine_10A():
+    system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_ei4_10A()
+    check_pair_pot_caffeine(system, nlist, scalings, part_pair, pair_fn, 1e-9)
+
 #
 # 4113_01WaterWater tests
 #
@@ -1327,30 +1355,35 @@ def test_gpos_vtens_pair_pot_caffeine_lj_15A():
     system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_lj_15A()
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
 def test_gpos_vtens_pair_pot_caffeine_mm3_15A():
     system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_mm3_15A()
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
 def test_gpos_vtens_pair_pot_caffeine_grimme_15A():
     system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_grimme_15A()
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
 def test_gpos_vtens_pair_pot_caffeine_exprep_5A_case1():
     system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_exprep_5A(0, 0.0, 0, 0.0)
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
 def test_gpos_vtens_pair_pot_caffeine_exprep_5A_case2():
     system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_exprep_5A(1, 2.385e-2, 1, 7.897e-3)
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
 def test_gpos_vtens_pair_pot_caffeine_ljcross_9A():
@@ -1363,24 +1396,35 @@ def test_gpos_vtens_pair_pot_caffeine_dampdisp_9A():
     system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_dampdisp_9A()
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
 def test_gpos_vtens_pair_pot_caffeine_ei1_10A():
     system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_ei1_10A()
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
 def test_gpos_vtens_pair_pot_caffeine_ei2_10A():
     system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_ei2_10A()
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
-def test_gpos_vtens_pair_pot_caffeine_ei2_10A():
+def test_gpos_vtens_pair_pot_caffeine_ei3_10A():
     system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_ei3_10A()
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
+
+
+def test_gpos_vtens_pair_pot_caffeine_ei4_10A():
+    system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_ei4_10A()
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
 def test_gpos_vtens_pot_4113_01WaterWater_eislater1s1scorr():
@@ -1479,6 +1523,7 @@ def test_bks_vtens_gpos_parts():
     for part in ff.parts:
         check_vtens_part(system, part, ff.nlist)
         check_gpos_part(system, part, ff.nlist)
+        check_hess_part(system, part, ff.nlist)
 
 #
 # Tests for toy systems

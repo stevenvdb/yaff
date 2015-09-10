@@ -31,7 +31,8 @@ from yaff import *
 
 
 __all__ = [
-    'check_gpos_part', 'check_vtens_part', 'check_gpos_ff', 'check_vtens_ff',
+    'check_gpos_part', 'check_vtens_part', 'check_hess_part',
+    'check_gpos_ff', 'check_vtens_ff',
 ]
 
 
@@ -98,6 +99,55 @@ def check_vtens_part(system, part, nlists=None, symm_vtens=True):
     x = rvecs.ravel()
     dxs = np.random.normal(0, 1e-4, (100, len(x)))
     check_delta(fn, x, dxs)
+
+
+def check_hess_part(system, part, nlists=None, numgrad=False):
+    def fn(x, do_gradient=False):
+        system.pos[:] = x.reshape(system.natom, 3)
+        if nlists is not None:
+            nlists.update()
+        if do_gradient:
+            gpos = np.zeros(system.pos.shape, float)
+            hess = np.zeros((np.prod(gpos.shape),np.prod(gpos.shape)),float)
+            e = part.compute(gpos,hess=hess)
+            assert np.isfinite(e)
+            assert np.isfinite(gpos).all()
+            assert np.isfinite(hess).all()
+            return gpos.ravel()[iatom], hess[iatom,:]
+        else:
+            gpos = np.zeros(system.pos.shape, float)
+            e = part.compute(gpos)
+            assert np.isfinite(e)
+            assert np.isfinite(gpos).all()
+            return gpos.ravel()[iatom]
+
+    if numgrad:
+        x_copy = system.pos.copy()
+        x = system.pos.ravel()
+        dxs = np.random.normal(0, 1e-4, (100, len(x)))
+        # Column i of the hessian is the derivative of element i of the gradient.
+        # This is checked by computing that derivative numerically
+        # This test can take a while...
+        for iatom in xrange(3*system.natom):
+            check_delta(fn, x, dxs)
+        system.pos[:] = x_copy
+    # Next we compare the analytical hessian with the numerical estimate from
+    # Yaff. This is actually more or less the same as above...
+    # Values of the thresholds are debatable...
+    if nlists is not None:
+        nlists.update()
+    hessian_ana = np.zeros((np.prod(system.pos.shape),np.prod(system.pos.shape)),float)
+    part.compute(hess=hessian_ana)
+    hessian_num = estimate_cart_hessian(ForceField(system, [part], nlists))
+    print hessian_ana[:6,:6]
+    print hessian_num[:6,:6]
+    av_err = np.mean((hessian_num-hessian_ana)**2)
+    # To compute a meaningful relative error, mask out very small reference values
+    mask = np.abs(hessian_num) > 1e-8
+    max_relerr = np.amax( (hessian_ana[mask]/hessian_num[mask]-1.0)**2)
+    index_relerr = np.argmax( (hessian_ana[mask]/hessian_num[mask]-1.0)**2)
+    assert av_err<1e-10, "Average hessian error too large %5.1e" % av_err
+    assert max_relerr<1e-7, "Largest relative error of hessian too large %5.1e (%+5.1e - %+5.1e)" % (max_relerr,hessian_num[mask][index_relerr],hessian_ana[mask][index_relerr])
 
 
 def check_gpos_ff(ff):

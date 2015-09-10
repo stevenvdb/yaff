@@ -514,8 +514,9 @@ cdef class Truncation:
                 The cutoff radius.
         '''
         cdef double hg
-        hg = 0.0
-        h = truncation.trunc_scheme_fn(self._c_trunc_scheme, d, rcut, &hg)
+        cdef double hgg
+        hg, hgg = 0.0, 0.0
+        h = truncation.trunc_scheme_fn(self._c_trunc_scheme, d, rcut, &hg, &hgg)
         return h, hg
 
 
@@ -599,11 +600,13 @@ cdef class PairPot:
     '''Base class for the pair potentials'''
     cdef pair_pot.pair_pot_type* _c_pair_pot
     cdef Truncation tr
+    cdef long _c_hsize
 
     def __cinit__(self, *args, **kwargs):
         self._c_pair_pot = pair_pot.pair_pot_new()
         if self._c_pair_pot is NULL:
             raise MemoryError()
+        self._c_hsize = 0
 
     def __dealloc__(self):
         if pair_pot.pair_pot_ready(self._c_pair_pot):
@@ -632,7 +635,8 @@ cdef class PairPot:
     def compute(self, np.ndarray[nlist.neigh_row_type, ndim=1] neighs,
                 np.ndarray[pair_pot.scaling_row_type, ndim=1] stab,
                 np.ndarray[double, ndim=2] gpos,
-                np.ndarray[double, ndim=2] vtens, long nneigh):
+                np.ndarray[double, ndim=2] vtens,
+                np.ndarray[double, ndim=2] hess, long nneigh):
         '''Compute the pairwise interactions
 
            **Arguments:**
@@ -653,6 +657,9 @@ cdef class PairPot:
                 The output array for the virial tensor. If none, it is not
                 computed.
 
+           hess
+                The output array for the hessian. If none, it is not computed.
+
            nneigh
                 The number of records to consider in the neighbor list.
 
@@ -660,6 +667,7 @@ cdef class PairPot:
         '''
         cdef double *my_gpos
         cdef double *my_vtens
+        cdef double *my_hess
 
         assert pair_pot.pair_pot_ready(self._c_pair_pot)
         assert neighs.flags['C_CONTIGUOUS']
@@ -680,10 +688,17 @@ cdef class PairPot:
             assert vtens.shape[1] == 3
             my_vtens = <double*>vtens.data
 
+        if hess is None:
+            my_hess = NULL
+        else:
+            assert hess.flags['C_CONTIGUOUS']
+            my_hess = <double*>hess.data
+            self._c_hsize = hess.shape[0]
+
         return pair_pot.pair_pot_compute(
             <nlist.neigh_row_type*>neighs.data, nneigh,
             <pair_pot.scaling_row_type*>stab.data, len(stab),
-            self._c_pair_pot, my_gpos, my_vtens
+            self._c_pair_pot, my_gpos, my_vtens, my_hess, self._c_hsize
         )
 
 
@@ -1593,11 +1608,15 @@ cdef class PairPotEIDip(PairPot):
     def compute(self, np.ndarray[nlist.neigh_row_type, ndim=1] neighs,
                 np.ndarray[pair_pot.scaling_row_type, ndim=1] stab,
                 np.ndarray[double, ndim=2] gpos,
-                np.ndarray[double, ndim=2] vtens, long nneigh):
+                np.ndarray[double, ndim=2] vtens,
+                np.ndarray[double, ndim=2] hess, long nneigh):
         #Override parents method to add dipole creation energy
         #TODO: Does this contribute to gpos or vtens?
+        #TODO: Implement Hessian
+        if hess is not None:
+            raise NotImplementedError('Hessian not yet implemented for PairPotEIDip')
         log("Computing PairPotEIDip energy and gradient")
-        E = PairPot.compute(self, neighs, stab, gpos, vtens, nneigh)
+        E = PairPot.compute(self, neighs, stab, gpos, vtens, hess, nneigh)
         E += 0.5*np.dot( np.transpose(np.reshape( self._c_dipoles, (-1,) )) , np.dot( self.poltens_i, np.reshape( self._c_dipoles, (-1,) ) ) )
         return E
 
@@ -2414,7 +2433,8 @@ def compute_ewald_reci(np.ndarray[double, ndim=2] pos,
                        double gcut, double dielectric,
                        np.ndarray[double, ndim=2] gpos,
                        np.ndarray[double, ndim=1] work,
-                       np.ndarray[double, ndim=2] vtens):
+                       np.ndarray[double, ndim=2] vtens,
+                       np.ndarray[double, ndim=2] hess):
     '''Compute the reciprocal interaction term in the Ewald summation scheme
 
        **Arguments:**
@@ -2457,10 +2477,15 @@ def compute_ewald_reci(np.ndarray[double, ndim=2] pos,
        vtens
             If not set to None, the virial tensor is computed and stored in
             this array. numpy array with shape (3, 3).
+
+       hess
+            If not set to None, the hessian is computed and stored in
+            this array. numpy array with shape (3*natom, 3*natom).
     '''
     cdef double *my_gpos
     cdef double *my_work
     cdef double *my_vtens
+    cdef double *my_hess
 
     assert pos.flags['C_CONTIGUOUS']
     assert pos.shape[1] == 3
@@ -2492,11 +2517,17 @@ def compute_ewald_reci(np.ndarray[double, ndim=2] pos,
         assert vtens.shape[1] == 3
         my_vtens = <double*>vtens.data
 
+    if hess is None:
+        my_hess = NULL
+    else:
+        assert hess.flags['C_CONTIGUOUS']
+        my_hess = <double*>hess.data
+
     return ewald.compute_ewald_reci(<double*>pos.data, len(pos),
                                     <double*>charges.data,
                                     unitcell._c_cell, alpha, <long*>gmax.data,
                                     gcut, dielectric, my_gpos, my_work,
-                                    my_vtens)
+                                    my_vtens, my_hess)
 
 
 def compute_ewald_reci_dd(np.ndarray[double, ndim=2] pos,
@@ -2599,7 +2630,8 @@ def compute_ewald_corr(np.ndarray[double, ndim=2] pos,
                        np.ndarray[pair_pot.scaling_row_type, ndim=1] stab,
                        double dielectric,
                        np.ndarray[double, ndim=2] gpos,
-                       np.ndarray[double, ndim=2] vtens):
+                       np.ndarray[double, ndim=2] vtens,
+                       np.ndarray[double, ndim=2] hess):
     '''Compute the corrections to the reciprocal Ewald term due to scaled
        short-range non-bonding interactions.
 
@@ -2634,10 +2666,15 @@ def compute_ewald_corr(np.ndarray[double, ndim=2] pos,
        vtens
             If not set to None, the virial tensor is computed and stored in
             this array. numpy array with shape (3, 3).
+
+       hess
+            If not set to None, the hessian is computed and stored in this
+            array. NumPu array with shape (3*natom,3*natom).
     '''
 
     cdef double *my_gpos
     cdef double *my_vtens
+    cdef double *my_hess
 
     assert pos.flags['C_CONTIGUOUS']
     assert pos.shape[1] == 3
@@ -2662,10 +2699,16 @@ def compute_ewald_corr(np.ndarray[double, ndim=2] pos,
         assert vtens.shape[1] == 3
         my_vtens = <double*>vtens.data
 
+    if hess is None:
+        my_hess = NULL
+    else:
+        assert hess.flags['C_CONTIGUOUS']
+        my_hess = <double*>hess.data
+
     return ewald.compute_ewald_corr(
         <double*>pos.data, <double*>charges.data, unitcell._c_cell, alpha,
         <pair_pot.scaling_row_type*>stab.data, len(stab), dielectric,
-        my_gpos, my_vtens, len(pos)
+        my_gpos, my_vtens, my_hess, len(pos)
     )
 
 def compute_ewald_corr_dd(np.ndarray[double, ndim=2] pos,

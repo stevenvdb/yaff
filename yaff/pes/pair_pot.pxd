@@ -48,7 +48,7 @@ cdef extern from "pair_pot.h":
     double pair_pot_compute(nlist.neigh_row_type* neighs, long nneigh,
                             scaling_row_type* scaling, long scaling_size,
                             pair_pot_type* pair_pot, double *gpos,
-                            double* vtens)
+                            double* vtens, double* hess, long hsize)
 
     void pair_data_lj_init(pair_pot_type *pair_pot, double *sigma, double *epsilon)
 
