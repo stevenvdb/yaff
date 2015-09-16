@@ -33,3 +33,5 @@ cdef extern from "iclist.h":
 
     void iclist_forward(dlist.dlist_row_type* deltas, iclist_row_type* ictab, long nic)
     void iclist_back(dlist.dlist_row_type* deltas, iclist_row_type* ictab, long nic)
+    void iclist_jacobian(dlist.dlist_row_type* deltas, iclist_row_type* ictab, long nic, long ndelta, double* jacobian)
+    void iclist_hessian(dlist.dlist_row_type* deltas, iclist_row_type* ictab, long nic, long ndelta, double* jacobian)

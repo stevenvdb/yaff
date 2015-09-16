@@ -34,3 +34,4 @@ cdef extern from "vlist.h":
 
     double vlist_forward(iclist.iclist_row_type* ictab, vlist_row_type* vtab, long nv)
     void vlist_back(iclist.iclist_row_type* ictab, vlist_row_type* vtab, long nv)
+    void vlist_hessian(iclist.iclist_row_type* ictab, vlist_row_type* vtab, long nv, long nic, double* hessian)

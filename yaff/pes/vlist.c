@@ -167,3 +167,80 @@ void vlist_back(iclist_row_type* ictab, vlist_row_type* vtab, long nv) {
     v_back_fns[vtab[i].kind](vtab + i, ictab);
   }
 }
+
+typedef void (*v_hessian_type)(vlist_row_type*, iclist_row_type*, long nic, double* hessian);
+
+void hessian_harmonic(vlist_row_type* term, iclist_row_type* ictab, long nic, double* hessian) {
+  long index = (*term).ic0*(nic+1);
+  hessian[index] += (*term).par0;
+}
+
+void hessian_polyfour(vlist_row_type* term, iclist_row_type* ictab, long nic, double* hessian) {
+  long index = (*term).ic0*(nic+1);
+  double q = ictab[(*term).ic0].value;
+  hessian[index] += 2.0*(*term).par1 + 6.0*(*term).par2*q + 12.0*(*term).par3*q*q;
+}
+
+void hessian_fues(vlist_row_type* term, iclist_row_type* ictab, long nic, double* hessian) {
+  long index = (*term).ic0*(nic+1);
+  double x = (*term).par1/ictab[(*term).ic0].value;
+  hessian[index] += (*term).par0*x*x*x*(3.0*x-2.0);
+}
+
+void hessian_cross(vlist_row_type* term, iclist_row_type* ictab, long nic, double* hessian) {
+  long index = (*term).ic0*nic+(*term).ic1;
+  hessian[index] += (*term).par0;
+  index = (*term).ic1*nic+(*term).ic0;
+  hessian[index] += (*term).par0;
+}
+
+void hessian_cosine(vlist_row_type* term, iclist_row_type* ictab, long nic, double* hessian) {
+  long index = (*term).ic0*(nic+1);
+  hessian[index] += 0.5*(*term).par1*(*term).par0*(*term).par0*cos(
+    (*term).par0*(ictab[(*term).ic0].value - (*term).par2)
+  );
+}
+
+void hessian_chebychev1(vlist_row_type* term, iclist_row_type* ictab, long nic, double* hessian) {
+  //Nothing to do here...
+}
+
+void hessian_chebychev2(vlist_row_type* term, iclist_row_type* ictab, long nic, double* hessian) {
+  long index = (*term).ic0*(nic+1);
+  hessian[index] += (*term).par1*2.0*(*term).par0;
+}
+
+void hessian_chebychev3(vlist_row_type* term, iclist_row_type* ictab, long nic, double* hessian) {
+  long index = (*term).ic0*(nic+1);
+  double c;
+  c = ictab[(*term).ic0].value;
+  hessian[index] += (*term).par1*12*(*term).par0*c;
+}
+
+void hessian_chebychev4(vlist_row_type* term, iclist_row_type* ictab, long nic, double* hessian) {
+  long index = (*term).ic0*(nic+1);
+  double c;
+  c = ictab[(*term).ic0].value;
+  hessian[index] += (*term).par1*8*(*term).par0*(6*c*c-1);
+}
+
+void hessian_chebychev6(vlist_row_type* term, iclist_row_type* ictab, long nic, double* hessian) {
+  long index = (*term).ic0*(nic+1);
+  double c;
+  c = ictab[(*term).ic0].value;
+  hessian[index] += (*term).par1*6*(*term).par0*(80*c*c*c*c-48*c*c+3);
+}
+
+v_hessian_type v_hessian_fns[10] = {
+  hessian_harmonic, hessian_polyfour, hessian_fues, hessian_cross, hessian_cosine,
+  hessian_chebychev1, hessian_chebychev2, hessian_chebychev3, hessian_chebychev4,
+  hessian_chebychev6
+};
+
+
+void vlist_hessian(iclist_row_type* ictab, vlist_row_type* vtab, long nv, long nic, double* hessian) {
+  long i;
+  for (i=0; i<nv; i++) {
+    v_hessian_fns[vtab[i].kind](vtab + i, ictab, nic, hessian);
+  }
+}

@@ -52,8 +52,8 @@ __all__ = [
     'PairPotEiSlater1s1sCorr', 'PairPotEiSlater1sp1spCorr', 'PairPotOlpSlater1s1s',
     'PairPotChargeTransferSlater1s1s', 'compute_ewald_reci', 'compute_ewald_reci_dd',
     'compute_ewald_corr', 'compute_ewald_corr_dd', 'dlist_forward',
-    'dlist_back', 'iclist_forward', 'iclist_back', 'vlist_forward',
-    'vlist_back', 'compute_grid3d'
+    'dlist_back', 'iclist_forward', 'iclist_back', 'iclist_jacobian', 'iclist_hessian',
+    'vlist_forward', 'vlist_back', 'vlist_hessian', 'compute_grid3d'
 ]
 
 
@@ -2986,6 +2986,62 @@ def iclist_back(np.ndarray[dlist.dlist_row_type, ndim=1] deltas,
                        <iclist.iclist_row_type*>ictab.data, nic)
 
 
+def iclist_jacobian(np.ndarray[dlist.dlist_row_type, ndim=1] deltas,
+                np.ndarray[iclist.iclist_row_type, ndim=1] ictab,
+                np.ndarray[double, ndim=2] jacobian, long nic):
+    '''The back-propagation step in the internal coordinate list
+
+       deltas
+            The delta list array (output)
+
+       ictab
+            The table with internal coordinates that must be computed (input).
+
+       nic
+            The number of records in the ``ictab`` array to compute.
+
+       This routine transforms the partial derivatives of the energy towards the
+       internal coordinates, stored in ``ictab``, into partial derivatives of
+       the energy towards relative vectors, added to ``deltas``.
+    '''
+    cdef long _c_ndelta
+    _c_ndelta = jacobian.shape[1]
+    assert deltas.flags['C_CONTIGUOUS']
+    assert ictab.flags['C_CONTIGUOUS']
+    assert jacobian.flags['C_CONTIGUOUS']
+    assert jacobian.shape[0] == nic
+    iclist.iclist_jacobian(<dlist.dlist_row_type*>deltas.data,
+                       <iclist.iclist_row_type*>ictab.data, nic, _c_ndelta, <double*>jacobian.data)
+
+
+def iclist_hessian(np.ndarray[dlist.dlist_row_type, ndim=1] deltas,
+                np.ndarray[iclist.iclist_row_type, ndim=1] ictab,
+                np.ndarray[double, ndim=2] hessian, long nic):
+    '''The back-propagation step in the internal coordinate list
+
+       deltas
+            The delta list array (output)
+
+       ictab
+            The table with internal coordinates that must be computed (input).
+
+       nic
+            The number of records in the ``ictab`` array to compute.
+
+       This routine transforms the partial derivatives of the energy towards the
+       internal coordinates, stored in ``ictab``, into partial derivatives of
+       the energy towards relative vectors, added to ``deltas``.
+    '''
+    cdef long _c_ndelta
+    _c_ndelta = hessian.shape[1]
+    assert deltas.flags['C_CONTIGUOUS']
+    assert ictab.flags['C_CONTIGUOUS']
+    assert hessian.flags['C_CONTIGUOUS']
+    assert hessian.shape[0] == _c_ndelta
+    iclist.iclist_hessian(<dlist.dlist_row_type*>deltas.data,
+                       <iclist.iclist_row_type*>ictab.data, nic, _c_ndelta, <double*>hessian.data)
+
+
 #
 # Valence list
 #
@@ -3033,6 +3089,32 @@ def vlist_back(np.ndarray[iclist.iclist_row_type, ndim=1] ictab,
     assert vtab.flags['C_CONTIGUOUS']
     vlist.vlist_back(<iclist.iclist_row_type*>ictab.data,
                      <vlist.vlist_row_type*>vtab.data, nv)
+
+def vlist_hessian(np.ndarray[iclist.iclist_row_type, ndim=1] ictab,
+               np.ndarray[vlist.vlist_row_type, ndim=1] vtab, long nv,
+               np.ndarray[double, ndim=2] hessian):
+    '''Compute second derivative of valence terms wrt internal coordinates
+
+       **Arguments:**
+
+       ictab
+            The table with internal coordinates (output).
+
+       vtab
+            The table with covalent energy terms (input).
+
+       nv
+            The number of records to consider in ``vtab``.
+
+       hessian
+            NumPy array (nic,nic) to store the second derivatives
+    '''
+    cdef long _c_nic
+    _c_nic = hessian.shape[0]
+    assert ictab.flags['C_CONTIGUOUS']
+    assert vtab.flags['C_CONTIGUOUS']
+    vlist.vlist_hessian(<iclist.iclist_row_type*>ictab.data,
+                     <vlist.vlist_row_type*>vtab.data, nv, _c_nic, <double*>hessian.data)
 
 #
 # grid

@@ -24,13 +24,16 @@
 
 
 import numpy as np
-from molmod import bond_length, bend_angle, bend_cos, dihed_angle, dihed_cos
+from molmod import bond_length, bend_angle, bend_cos, dihed_angle, dihed_cos, \
+    check_delta
+from nose.plugins.skip import SkipTest
 
 from yaff import *
 
 from yaff.test.common import get_system_quartz, get_system_peroxide, \
     get_system_mil53, get_system_water32, get_system_formaldehyde, \
     get_system_amoniak
+from yaff.pes.test.common import check_jacobian_ic, check_hessian_oneic
 
 
 def test_iclist_quartz_bonds():
@@ -365,3 +368,241 @@ def test_oop_meanangle_amoniak():
         assert abs(delta['gx'] - mean[0]) < 1e-8
         assert abs(delta['gy'] - mean[1]) < 1e-8
         assert abs(delta['gz'] - mean[2]) < 1e-8
+
+
+def test_jacobian_bond_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(Bond(0,3))
+    dlist.forward()
+    iclist.forward()
+    check_jacobian_ic(system, dlist, iclist)
+
+
+def test_jacobian_bend_cos_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(BendCos(0,1,3))
+    dlist.forward()
+    iclist.forward()
+    check_jacobian_ic(system, dlist, iclist)
+
+
+def test_jacobian_bend_angle_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(BendAngle(0,1,3))
+    dlist.forward()
+    iclist.forward()
+    check_jacobian_ic(system, dlist, iclist)
+
+
+def test_jacobian_dihed_cos_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(DihedCos(0,1,3,2))
+    dlist.forward()
+    iclist.forward()
+    check_jacobian_ic(system, dlist, iclist)
+
+
+def test_jacobian_dihed_angle_formaldehyde():
+    raise SkipTest('Current implementation of dihedral angle is numerically instable for derivatives close to 0 and 180 deg.')
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(DihedAngle(0,1,2,3))
+    dlist.forward()
+    iclist.forward()
+    check_jacobian_ic(system, dlist, iclist)
+
+
+def test_jacobian_urey_bradley_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(UreyBradley(0,1,3))
+    dlist.forward()
+    iclist.forward()
+    check_jacobian_ic(system, dlist, iclist)
+
+
+def test_jacobian_oop_cos_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopCos(0,1,2,3))
+    dlist.forward()
+    iclist.forward()
+    check_jacobian_ic(system, dlist, iclist)
+
+
+def test_jacobian_oop_meancos_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopMeanCos(0,1,2,3))
+    dlist.forward()
+    iclist.forward()
+    check_jacobian_ic(system, dlist, iclist)
+
+
+def test_jacobian_oop_angle_formaldehyde():
+    raise SkipTest('Current implementation of oop angle is numerically instable for derivatives close to 0 and 180 deg.')
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopAngle(0,1,2,3))
+    dlist.forward()
+    iclist.forward()
+    check_jacobian_ic(system, dlist, iclist)
+
+
+def test_jacobian_oop_meanangle_formaldehyde():
+    raise SkipTest('Current implementation of oop angle is numerically instable for derivatives close to 0 and 180 deg.')
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopMeanAngle(0,1,2,3))
+    dlist.forward()
+    iclist.forward()
+    check_jacobian_ic(system, dlist, iclist)
+
+
+def test_jacobian_oop_dist_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopDist(0,1,2,3))
+    dlist.forward()
+    iclist.forward()
+    check_jacobian_ic(system, dlist, iclist)
+
+
+def test_hessian_bond_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(Bond(0,2))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_bend_cos_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    dlist.add_delta(0,3)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(BendCos(0,3,1))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_bend_angle_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    dlist.add_delta(0,3)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(BendAngle(0,3,1))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_dihed_cos_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    dlist.add_delta(0,3)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(DihedCos(0,1,2,3))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_dihed_angle_formaldehyde():
+    raise SkipTest('Current implementation of dihedral angle is numerically instable for derivatives close to 0 and 180 deg.')
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    dlist.add_delta(0,3)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(DihedAngle(0,3,2,1))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_dihed_angle_mil53():
+    system = get_system_mil53()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(DihedAngle(0,3,2,8))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_oop_cos_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    dlist.add_delta(0,3)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopCos(0,1,2,3))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_oop_meancos_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopMeanCos(0,1,2,3))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_oop_meancos_amoniak():
+    system = get_system_amoniak()
+    dlist = DeltaList(system)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopCos(2,3,1,0))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_oop_angle_formaldehyde():
+    raise SkipTest('Current implementation of oop angle is numerically instable for derivatives close to 0 and 180 deg.')
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    dlist.add_delta(0,3)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopAngle(0,1,2,3))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_oop_angle_amoniak():
+    system = get_system_amoniak()
+    dlist = DeltaList(system)
+    dlist.add_delta(0,3)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopAngle(0,1,2,3))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_oop_meanangle_formaldehyde():
+    raise SkipTest('Current implementation of oop angle is numerically instable for derivatives close to 0 and 180 deg.')
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    dlist.add_delta(0,3)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopMeanAngle(0,1,2,3))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_oop_meanangle_amoniak():
+    system = get_system_amoniak()
+    dlist = DeltaList(system)
+    dlist.add_delta(0,3)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopMeanAngle(3,1,2,0))
+    check_hessian_oneic(dlist, iclist)
+
+
+def test_hessian_oop_distance_formaldehyde():
+    system = get_system_formaldehyde()
+    dlist = DeltaList(system)
+    dlist.add_delta(0,3)
+    iclist = InternalCoordinateList(dlist)
+    iclist.add_ic(OopDist(0,1,2,3))
+    check_hessian_oneic(dlist, iclist)

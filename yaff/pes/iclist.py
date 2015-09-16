@@ -61,7 +61,8 @@
 import numpy as np
 
 from yaff.log import log
-from yaff.pes.ext import iclist_forward, iclist_back
+from yaff.pes.ext import iclist_forward, iclist_back, iclist_jacobian,\
+                iclist_hessian
 
 
 __all__ = [
@@ -145,6 +146,15 @@ class InternalCoordinateList(object):
         """
         iclist_back(self.dlist.deltas, self.ictab, self.nic)
 
+    def jacobian(self):
+        jac = np.zeros((self.nic,3*self.dlist.ndelta),float)
+        iclist_jacobian(self.dlist.deltas, self.ictab, jac, self.nic)
+        return jac
+
+    def hessian(self):
+        hess = np.zeros((3*self.dlist.ndelta,3*self.dlist.ndelta),float)
+        iclist_hessian(self.dlist.deltas, self.ictab, hess, self.nic)
+        return hess
 
 class InternalCoordinate(object):
     """Base class for the internal coordinate 'descriptors'.

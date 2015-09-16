@@ -30,7 +30,7 @@ from yaff import *
 
 from yaff.test.common import get_system_quartz, get_system_water32, \
     get_system_2T, get_system_peroxide, get_system_mil53, get_system_formaldehyde
-from yaff.pes.test.common import check_gpos_part, check_vtens_part
+from yaff.pes.test.common import check_gpos_part, check_vtens_part, check_hess_part
 
 
 def test_vlist_quartz_bonds():
@@ -866,3 +866,93 @@ def test_gpos_vtens_oopdist_formaldehyde():
     part.add_term(Harmonic(0.0,0.0*angstrom,OopDist(2,3,1,0)))
     check_gpos_part(system, part)
     check_vtens_part(system, part)
+
+
+def test_gpos_vtens_hessian_harmonic_formaldehyde():
+    system = get_system_formaldehyde()
+    system.pos[0,0] += 0.5*angstrom
+    system.pos[0,1] += 0.35*angstrom
+    part = ForcePartValence(system)
+    part.add_term(Harmonic(3.0,1.6*angstrom,Bond(1,0)))
+    check_hess_part(system,part)
+
+
+def test_gpos_vtens_hessian_polyfour_formaldehyde():
+    system = get_system_formaldehyde()
+    system.pos[0,0] += 0.5*angstrom
+    system.pos[0,1] += 0.35*angstrom
+    part = ForcePartValence(system)
+    part.add_term(PolyFour([2.0,3.0,4.0,5.0],Bond(1,0)))
+    check_hess_part(system,part)
+
+
+def test_gpos_vtens_hessian_fues_formaldehyde():
+    system = get_system_formaldehyde()
+    system.pos[0,0] += 0.5*angstrom
+    system.pos[0,1] += 0.35*angstrom
+    part = ForcePartValence(system)
+    part.add_term(Fues(8.6,12.2,Bond(1,0)))
+    check_hess_part(system,part)
+
+
+def test_gpos_vtens_hessian_cross_formaldehyde():
+    system = get_system_formaldehyde()
+    system.pos[0,0] += 0.5*angstrom
+    system.pos[0,1] += 0.35*angstrom
+    part = ForcePartValence(system)
+    part.add_term(Cross(2.1,2.2,1.6,Bond(1,0),Bond(3,0)))
+    check_hess_part(system,part)
+
+
+def test_gpos_vtens_hessian_cosine_formaldehyde():
+    system = get_system_formaldehyde()
+    system.pos[0,0] += 0.5*angstrom
+    system.pos[0,1] += 0.35*angstrom
+    part = ForcePartValence(system)
+    part.add_term(Cosine(3,0.6,2.5,Bond(1,0)))
+    check_hess_part(system,part)
+
+
+def test_gpos_vtens_hessian_chebychev1_formaldehyde():
+    system = get_system_formaldehyde()
+    system.pos[0,0] += 0.5*angstrom
+    system.pos[0,1] += 0.35*angstrom
+    part = ForcePartValence(system)
+    part.add_term(Chebychev1(3.5,Bond(1,0),sign=1))
+    check_hess_part(system,part)
+
+
+def test_gpos_vtens_hessian_chebychev2_formaldehyde():
+    system = get_system_formaldehyde()
+    system.pos[0,0] += 0.5*angstrom
+    system.pos[0,1] += 0.35*angstrom
+    part = ForcePartValence(system)
+    part.add_term(Chebychev2(3.5,Bond(1,0),sign=1))
+    check_hess_part(system,part)
+
+
+def test_gpos_vtens_hessian_chebychev3_formaldehyde():
+    system = get_system_formaldehyde()
+    system.pos[0,0] += 0.5*angstrom
+    system.pos[0,1] += 0.35*angstrom
+    part = ForcePartValence(system)
+    part.add_term(Chebychev3(3.5,Bond(1,0),sign=1))
+    check_hess_part(system,part)
+
+
+def test_gpos_vtens_hessian_chebychev4_formaldehyde():
+    system = get_system_formaldehyde()
+    system.pos[0,0] += 0.5*angstrom
+    system.pos[0,1] += 0.35*angstrom
+    part = ForcePartValence(system)
+    part.add_term(Chebychev4(3.5,Bond(1,0),sign=1))
+    check_hess_part(system,part)
+
+
+def test_gpos_vtens_hessian_chebychev6_formaldehyde():
+    system = get_system_formaldehyde()
+    system.pos[0,0] += 0.5*angstrom
+    system.pos[0,1] += 0.35*angstrom
+    part = ForcePartValence(system)
+    part.add_term(Chebychev6(0.5,Bond(1,0),sign=1))
+    check_hess_part(system,part)

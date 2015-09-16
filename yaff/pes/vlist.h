@@ -36,5 +36,6 @@ typedef struct {
 
 double vlist_forward(iclist_row_type* ictab, vlist_row_type* vtab, long nv);
 void vlist_back(iclist_row_type* ictab, vlist_row_type* vtab, long nv);
+void vlist_hessian(iclist_row_type* ictab, vlist_row_type* vtab, long nv, long nic, double* hessian);
 
 #endif

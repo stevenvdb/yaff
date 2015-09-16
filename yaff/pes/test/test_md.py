@@ -32,7 +32,7 @@ from molmod.io import XYZWriter
 from yaff import *
 
 from yaff.test.common import get_system_water32
-from yaff.pes.test.common import check_gpos_ff, check_vtens_ff
+from yaff.pes.test.common import check_gpos_ff, check_vtens_ff, check_hess_ff
 
 
 def get_ff_water32(do_valence=False, do_lj=False, do_eireal=False, do_eireci=False):
@@ -86,6 +86,13 @@ def get_ff_water32(do_valence=False, do_lj=False, do_eireal=False, do_eireci=Fal
     return ForceField(system, parts, nlist)
 
 
+def get_ff_mil53():
+    system = System.from_file(context.get_fn('test/system_mil53_lp.chk'))
+    system = system.supercell(1,2,1)
+    ff = ForceField.generate(system, context.get_fn('test/parameters_mil53_complete.txt'))
+    return ff
+
+
 def test_gpos_water32_full():
     ff = get_ff_water32(True, True, True, True)
     check_gpos_ff(ff)
@@ -94,6 +101,11 @@ def test_gpos_water32_full():
 def test_vtens_water32_full():
     ff = get_ff_water32(True, True, True, True)
     check_vtens_ff(ff)
+
+
+def test_hess_water32_full():
+    ff = get_ff_water32(True, True, True, True)
+    check_hess_ff(ff)
 
 
 def test_md_water32_full():
@@ -128,3 +140,18 @@ def test_md_water32_full():
         velh = vel + tmp
     cqs = np.array(cqs)
     assert cqs.std() < 5e-3
+
+
+def test_gpos_mil53_full():
+    ff = get_ff_mil53()
+    check_gpos_ff(ff)
+
+
+def test_vtens_mil53_full():
+    ff = get_ff_mil53()
+    check_vtens_ff(ff)
+
+
+def test_hess_mil53_full():
+    ff = get_ff_mil53()
+    check_hess_ff(ff)

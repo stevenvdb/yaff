@@ -32,7 +32,8 @@ from yaff import *
 
 __all__ = [
     'check_gpos_part', 'check_vtens_part', 'check_hess_part',
-    'check_gpos_ff', 'check_vtens_ff',
+    'check_gpos_ff', 'check_vtens_ff', 'check_hess_ff', 'check_jacobian_ic',
+    'check_hessian_oneic',
 ]
 
 
@@ -101,7 +102,7 @@ def check_vtens_part(system, part, nlists=None, symm_vtens=True):
     check_delta(fn, x, dxs)
 
 
-def check_hess_part(system, part, nlists=None, numgrad=False):
+def check_hess_numgrad_part(system, part, nlists=None):
     def fn(x, do_gradient=False):
         system.pos[:] = x.reshape(system.natom, 3)
         if nlists is not None:
@@ -121,17 +122,17 @@ def check_hess_part(system, part, nlists=None, numgrad=False):
             assert np.isfinite(gpos).all()
             return gpos.ravel()[iatom]
 
-    if numgrad:
-        x_copy = system.pos.copy()
-        x = system.pos.ravel()
-        dxs = np.random.normal(0, 1e-4, (100, len(x)))
-        # Column i of the hessian is the derivative of element i of the gradient.
-        # This is checked by computing that derivative numerically
-        # This test can take a while...
-        for iatom in xrange(3*system.natom):
-            check_delta(fn, x, dxs)
-        system.pos[:] = x_copy
-    # Next we compare the analytical hessian with the numerical estimate from
+    x = system.pos.ravel()
+    dxs = np.random.normal(0, 1e-4, (100, len(x)))
+    # Column i of the hessian is the derivative of element i of the gradient.
+    # This is checked by computing that derivative numerically
+    # This test can take a while...
+    for iatom in xrange(3*system.natom):
+        check_delta(fn, x, dxs)
+
+
+def check_hess_part(system, part, nlists=None):
+    # We compare the analytical hessian with the numerical estimate from
     # Yaff. This is actually more or less the same as above...
     # Values of the thresholds are debatable...
     if nlists is not None:
@@ -139,15 +140,7 @@ def check_hess_part(system, part, nlists=None, numgrad=False):
     hessian_ana = np.zeros((np.prod(system.pos.shape),np.prod(system.pos.shape)),float)
     part.compute(hess=hessian_ana)
     hessian_num = estimate_cart_hessian(ForceField(system, [part], nlists))
-    print hessian_ana[:6,:6]
-    print hessian_num[:6,:6]
-    av_err = np.mean((hessian_num-hessian_ana)**2)
-    # To compute a meaningful relative error, mask out very small reference values
-    mask = np.abs(hessian_num) > 1e-8
-    max_relerr = np.amax( (hessian_ana[mask]/hessian_num[mask]-1.0)**2)
-    index_relerr = np.argmax( (hessian_ana[mask]/hessian_num[mask]-1.0)**2)
-    assert av_err<1e-10, "Average hessian error too large %5.1e" % av_err
-    assert max_relerr<1e-7, "Largest relative error of hessian too large %5.1e (%+5.1e - %+5.1e)" % (max_relerr,hessian_num[mask][index_relerr],hessian_ana[mask][index_relerr])
+    check_hess(hessian_ana, hessian_num)
 
 
 def check_gpos_ff(ff):
@@ -205,3 +198,121 @@ def check_vtens_ff(ff):
     x = rvecs.ravel()
     dxs = np.random.normal(0, 1e-4, (100, len(x)))
     check_delta(fn, x, dxs)
+
+
+def check_hess(hessian_ana, hessian_num):
+    av_err = np.mean((hessian_num-hessian_ana)**2)
+    # To compute a meaningful relative error, mask out very small reference values
+    mask = np.abs(hessian_num) > 1e-7
+    if np.sum(mask)>0:
+        max_relerr = np.amax( (hessian_ana[mask]/hessian_num[mask]-1.0)**2)
+        index_relerr = np.argmax( (hessian_ana[mask]/hessian_num[mask]-1.0)**2)
+        assert av_err<1e-10, "Average hessian error too large %5.1e" % av_err
+        assert max_relerr<1e-6, "Largest relative error of hessian too large %5.1e (%+5.1e - %+5.1e)" % (max_relerr,hessian_num[mask][index_relerr],hessian_ana[mask][index_relerr])
+
+
+def check_hess_ff(ff):
+    hessian_ana = np.zeros((np.prod(ff.system.pos.shape),np.prod(ff.system.pos.shape)),float)
+    ff.compute(hess=hessian_ana)
+    hessian_num = estimate_cart_hessian(ff)
+    check_hess(hessian_ana, hessian_num)
+
+
+def check_jacobian_ic(system, dlist, iclist):
+    '''
+    Check the implementation of the derivative of one internal coordinate
+    towards cartesian coordinates by comparison with the result obtained using
+    finite differences.
+    '''
+    def fn(x, do_gradient=False):
+        system.pos[:] = x.reshape(system.natom, 3)
+        dlist.forward()
+        iclist.forward()
+        if do_gradient:
+            q = iclist.ictab[0]['value']
+            jacobian = np.zeros(np.prod(system.pos.shape))
+            ic_jac = iclist.jacobian()[0]
+            kind = iclist.ictab[0]['kind']
+            # Loop over all relative vectors making up this internal coordinate
+            index = iclist.ictab[0]['i0']
+            i,j = dlist.deltas[index]['i'],dlist.deltas[index]['j']
+            jacobian[3*i:3*(i+1)] -= iclist.ictab[0]['sign0']*ic_jac[0:3]
+            jacobian[3*j:3*(j+1)] += iclist.ictab[0]['sign0']*ic_jac[0:3]
+            if not kind in [0,5]:
+                index = iclist.ictab[0]['i1']
+                i,j = dlist.deltas[index]['i'],dlist.deltas[index]['j']
+                jacobian[3*i:3*(i+1)] -= iclist.ictab[0]['sign1']*ic_jac[3:6]
+                jacobian[3*j:3*(j+1)] += iclist.ictab[0]['sign1']*ic_jac[3:6]
+            if not kind in [0,1,2,5]:
+                index = iclist.ictab[0]['i2']
+                i,j = dlist.deltas[index]['i'],dlist.deltas[index]['j']
+                jacobian[3*i:3*(i+1)] -= iclist.ictab[0]['sign2']*ic_jac[6:9]
+                jacobian[3*j:3*(j+1)] += iclist.ictab[0]['sign2']*ic_jac[6:9]
+            return q, jacobian
+        else:
+            return iclist.ictab[0]['value']
+
+    assert iclist.nic == 1
+    x = system.pos.ravel()
+    dxs = np.random.normal(0, 1e-4, (100, len(x)))
+    check_delta(fn, x, dxs)
+
+
+def check_hessian_oneic(dlist, iclist):
+    '''Check the second derivate of an internal coordinate towards the delta
+    vectors involved for this internal coordinate by comparing with finite
+    difference approach
+    '''
+    class OneIC(object):
+        def __init__(self, dlist, iclist):
+            assert iclist.nic == 1
+            self.dlist = dlist
+            self.iclist = iclist
+            self.dlist.forward()
+            self.x0 = np.zeros((dlist.ndelta*3,))
+            for i in xrange(dlist.ndelta):
+                self.x0[3*i+0] = self.dlist.deltas[i]['dx']
+                self.x0[3*i+1] = self.dlist.deltas[i]['dy']
+                self.x0[3*i+2] = self.dlist.deltas[i]['dz']
+
+        def fun(self, x, do_gradient=False):
+            for i in xrange(dlist.ndelta):
+                self.dlist.deltas[i]['dx'] = x[3*i+0]
+                self.dlist.deltas[i]['dy'] = x[3*i+1]
+                self.dlist.deltas[i]['dz'] = x[3*i+2]
+            self.iclist.forward()
+            q = self.iclist.ictab[0]['value']
+            gradient = self.iclist.jacobian()
+            return q, gradient
+
+        def reset(self):
+            for i in xrange(dlist.ndelta):
+                self.dlist.deltas[i]['dx'] = self.x0[3*i+0]
+                self.dlist.deltas[i]['dy'] = self.x0[3*i+1]
+                self.dlist.deltas[i]['dz'] = self.x0[3*i+2]
+
+    def estimate_hessian(oneic, eps=1e-4):
+        # Loop over all displacements
+        x1 = oneic.x0.copy()
+        rows = np.zeros((len(x1), len(x1)), float)
+        for i in xrange(len(x1)):
+            x1[i] = oneic.x0[i] + eps
+            epot, gradient_p = oneic.fun(x1, do_gradient=True)
+            x1[i] = oneic.x0[i] - eps
+            epot, gradient_m = oneic.fun(x1, do_gradient=True)
+            rows[i] = (gradient_p-gradient_m)/(2*eps)
+            x1[i] = oneic.x0[i]
+        oneic.reset()
+        # Enforce symmetry and return
+        return 0.5*(rows + rows.T)
+
+    # Estimate hessian with finite difference
+    oneic = OneIC(dlist, iclist)
+    hessian_num = estimate_hessian(oneic)
+    oneic.reset()
+    # Analytical hessian
+    dlist.forward()
+    iclist.forward()
+    iclist.ictab[0]['grad'] = 1.0
+    hessian_ana = iclist.hessian()
+    check_hess(hessian_ana, hessian_num)

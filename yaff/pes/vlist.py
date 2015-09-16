@@ -58,7 +58,7 @@
 import numpy as np
 
 from yaff.log import log
-from yaff.pes.ext import vlist_forward, vlist_back
+from yaff.pes.ext import vlist_forward, vlist_back, vlist_hessian
 
 
 __all__ = [
@@ -129,6 +129,15 @@ class ValenceList(object):
            The actual computation is carried out by a low-level C routine.
         """
         vlist_back(self.iclist.ictab, self.vtab, self.nv)
+
+    def hessian(self):
+        """Compute the second derivatives of the energy terms towards the
+           internal coordinates and return an (nic,nic) NumPy array with the
+           results.
+        """
+        hessian = np.zeros((self.iclist.nic,self.iclist.nic), float)
+        vlist_hessian(self.iclist.ictab, self.vtab, self.nv, hessian)
+        return hessian
 
 
 class ValenceTerm(object):

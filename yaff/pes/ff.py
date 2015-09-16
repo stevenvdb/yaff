@@ -609,8 +609,6 @@ class ForcePartEwaldNeutralizing(ForcePart):
 
     def _internal_compute(self, gpos, vtens, hess):
         with timer.section('Ewald neut.'):
-            if hess is not None:
-                raise NotImplementedError('Hessian computation not implemented for ForcePartEwaldNeutralizing')
             #TODO: interaction of dipoles with background? I think this is zero, need proof...
             fac = self.system.charges.sum()**2*np.pi/(2.0*self.system.cell.volume*self.alpha**2)/self.dielectric
             if self.system.radii is not None:
@@ -721,13 +719,39 @@ class ForcePartValence(ForcePart):
 
     def _internal_compute(self, gpos, vtens, hess):
         with timer.section('Valence'):
-            if hess is not None:
-                raise NotImplementedError('Hessian computation not implemented for ForcePartValence')
+            #if hess is not None:
+            #    raise NotImplementedError('Hessian computation not implemented for ForcePartValence')
             self.dlist.forward()
             self.iclist.forward()
             energy = self.vlist.forward()
             if not ((gpos is None) and (vtens is None)):
                 self.vlist.back()
+                if hess is not None:
+                    #TODO: exploit symmetry a bit further
+                    #TODO: The order of the hessian computation and back function matters
+                    # because iclist.jacobian() interferes with iclist.back()
+                    # Construct first part of the hessian
+                    hessian = self.vlist.hessian()
+                    jacobian = self.iclist.jacobian()
+                    tmp = np.dot(np.dot(jacobian.transpose(),hessian),jacobian)
+                    # Add second part
+                    tmp += self.iclist.hessian()
+                    for idelta in xrange(self.dlist.ndelta):
+                        i,j = self.dlist.deltas[idelta]['i'],self.dlist.deltas[idelta]['j']
+                        hess[3*i:3*(i+1),3*i:3*(i+1)] += tmp[3*idelta:3*(idelta+1),3*idelta:3*(idelta+1)]
+                        hess[3*i:3*(i+1),3*j:3*(j+1)] -= tmp[3*idelta:3*(idelta+1),3*idelta:3*(idelta+1)]
+                        hess[3*j:3*(j+1),3*i:3*(i+1)] -= tmp[3*idelta:3*(idelta+1),3*idelta:3*(idelta+1)]
+                        hess[3*j:3*(j+1),3*j:3*(j+1)] += tmp[3*idelta:3*(idelta+1),3*idelta:3*(idelta+1)]
+                        for jdelta in xrange(idelta+1,self.dlist.ndelta):
+                            k,l = self.dlist.deltas[jdelta]['i'],self.dlist.deltas[jdelta]['j']
+                            hess[3*i:3*(i+1),3*k:3*(k+1)] += tmp[3*idelta:3*(idelta+1),3*jdelta:3*(jdelta+1)]
+                            hess[3*k:3*(k+1),3*i:3*(i+1)] += tmp[3*jdelta:3*(jdelta+1),3*idelta:3*(idelta+1)]
+                            hess[3*i:3*(i+1),3*l:3*(l+1)] -= tmp[3*idelta:3*(idelta+1),3*jdelta:3*(jdelta+1)]
+                            hess[3*l:3*(l+1),3*i:3*(i+1)] -= tmp[3*jdelta:3*(jdelta+1),3*idelta:3*(idelta+1)]
+                            hess[3*j:3*(j+1),3*k:3*(k+1)] -= tmp[3*idelta:3*(idelta+1),3*jdelta:3*(jdelta+1)]
+                            hess[3*k:3*(k+1),3*j:3*(j+1)] -= tmp[3*jdelta:3*(jdelta+1),3*idelta:3*(idelta+1)]
+                            hess[3*j:3*(j+1),3*l:3*(l+1)] += tmp[3*idelta:3*(idelta+1),3*jdelta:3*(jdelta+1)]
+                            hess[3*l:3*(l+1),3*j:3*(j+1)] += tmp[3*jdelta:3*(jdelta+1),3*idelta:3*(idelta+1)]
                 self.iclist.back()
                 self.dlist.back(gpos, vtens)
             return energy
