@@ -200,6 +200,23 @@ def test_iter_bonds_empty():
     assert len(list(system.iter_bonds())) == 0
     assert len(list(system.iter_angles())) == 0
     assert len(list(system.iter_dihedrals())) == 0
+    assert len(list(system.iter_oops())) == 0
+
+
+def test_iter_bonds_water32():
+    system = get_system_water32()
+    assert len(list(system.iter_bonds())) == 2*32
+    assert len(list(system.iter_angles())) == 1*32
+    assert len(list(system.iter_dihedrals())) == 0*32
+    assert len(list(system.iter_oops())) == 0*32
+
+
+def test_iter_bonds_glycine():
+    system = get_system_glycine()
+    assert len(list(system.iter_bonds())) == 9
+    assert len(list(system.iter_angles())) == 13
+    assert len(list(system.iter_dihedrals())) == 14
+    assert len(list(system.iter_oops())) == 2
 
 
 def check_detect_ffatypes(system, rules):
