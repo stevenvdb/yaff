@@ -35,6 +35,10 @@ from yaff.test.common import get_system_quartz, get_system_peroxide, \
     get_system_amoniak
 from yaff.pes.test.common import check_jacobian_ic, check_hessian_oneic
 
+#TODO Extend most of the tests below to also include signs in the dlist that
+#are -1. When only one ic is in the iclist, the corresponding dlist will have
+#all signs 1.
+
 
 def test_iclist_quartz_bonds():
     system = get_system_quartz()
@@ -395,9 +399,10 @@ def test_jacobian_bend_angle_formaldehyde():
     dlist = DeltaList(system)
     iclist = InternalCoordinateList(dlist)
     iclist.add_ic(BendAngle(0,1,3))
+    iclist.add_ic(BendAngle(0,1,2))
     dlist.forward()
     iclist.forward()
-    check_jacobian_ic(system, dlist, iclist)
+    check_jacobian_ic(system, dlist, iclist, iic=1)
 
 
 def test_jacobian_dihed_cos_formaldehyde():
@@ -477,10 +482,15 @@ def test_jacobian_oop_dist_formaldehyde():
     system = get_system_formaldehyde()
     dlist = DeltaList(system)
     iclist = InternalCoordinateList(dlist)
+    dlist.add_delta(1,0)
+    iclist.add_ic(OopDist(0,1,3,2))
     iclist.add_ic(OopDist(0,1,2,3))
+    iclist.add_ic(OopDist(0,3,1,2))
+    iclist.add_ic(OopDist(3,1,0,2))
     dlist.forward()
     iclist.forward()
-    check_jacobian_ic(system, dlist, iclist)
+    for iic in xrange(iclist.nic):
+        check_jacobian_ic(system, dlist, iclist, iic=iic)
 
 
 def test_hessian_bond_formaldehyde():
@@ -512,7 +522,7 @@ def test_hessian_bend_angle_formaldehyde():
 def test_hessian_dihed_cos_formaldehyde():
     system = get_system_formaldehyde()
     dlist = DeltaList(system)
-    dlist.add_delta(0,3)
+    dlist.add_delta(0,1)
     iclist = InternalCoordinateList(dlist)
     iclist.add_ic(DihedCos(0,1,2,3))
     check_hessian_oneic(dlist, iclist)
@@ -602,7 +612,7 @@ def test_hessian_oop_meanangle_amoniak():
 def test_hessian_oop_distance_formaldehyde():
     system = get_system_formaldehyde()
     dlist = DeltaList(system)
-    dlist.add_delta(0,3)
+    dlist.add_delta(1,0)
     iclist = InternalCoordinateList(dlist)
     iclist.add_ic(OopDist(0,1,2,3))
     check_hessian_oneic(dlist, iclist)

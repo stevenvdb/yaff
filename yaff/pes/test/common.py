@@ -218,7 +218,7 @@ def check_hess_ff(ff):
     check_hess(hessian_ana, hessian_num)
 
 
-def check_jacobian_ic(system, dlist, iclist):
+def check_jacobian_ic(system, dlist, iclist, iic=0):
     '''
     Check the implementation of the derivative of one internal coordinate
     towards cartesian coordinates by comparison with the result obtained using
@@ -229,30 +229,31 @@ def check_jacobian_ic(system, dlist, iclist):
         dlist.forward()
         iclist.forward()
         if do_gradient:
-            q = iclist.ictab[0]['value']
+            q = iclist.ictab[iic]['value']
             jacobian = np.zeros(np.prod(system.pos.shape))
-            ic_jac = iclist.jacobian()[0]
-            kind = iclist.ictab[0]['kind']
+            ic_jac = iclist.jacobian()[iic]
+            kind = iclist.ictab[iic]['kind']
             # Loop over all relative vectors making up this internal coordinate
-            index = iclist.ictab[0]['i0']
+            index = iclist.ictab[iic]['i0']
             i,j = dlist.deltas[index]['i'],dlist.deltas[index]['j']
-            jacobian[3*i:3*(i+1)] -= iclist.ictab[0]['sign0']*ic_jac[0:3]
-            jacobian[3*j:3*(j+1)] += iclist.ictab[0]['sign0']*ic_jac[0:3]
+            d = iclist.ictab[iic]['i0']
+            jacobian[3*i:3*(i+1)] -= iclist.ictab[iic]['sign0']**0*ic_jac[3*d:3*(d+1)]
+            jacobian[3*j:3*(j+1)] += iclist.ictab[iic]['sign0']**0*ic_jac[3*d:3*(d+1)]
             if not kind in [0,5]:
-                index = iclist.ictab[0]['i1']
+                index = iclist.ictab[iic]['i1']
                 i,j = dlist.deltas[index]['i'],dlist.deltas[index]['j']
-                jacobian[3*i:3*(i+1)] -= iclist.ictab[0]['sign1']*ic_jac[3:6]
-                jacobian[3*j:3*(j+1)] += iclist.ictab[0]['sign1']*ic_jac[3:6]
+                d = iclist.ictab[iic]['i1']
+                jacobian[3*i:3*(i+1)] -= iclist.ictab[iic]['sign1']**0*ic_jac[3*d:3*(d+1)]
+                jacobian[3*j:3*(j+1)] += iclist.ictab[iic]['sign1']**0*ic_jac[3*d:3*(d+1)]
             if not kind in [0,1,2,5]:
-                index = iclist.ictab[0]['i2']
+                index = iclist.ictab[iic]['i2']
                 i,j = dlist.deltas[index]['i'],dlist.deltas[index]['j']
-                jacobian[3*i:3*(i+1)] -= iclist.ictab[0]['sign2']*ic_jac[6:9]
-                jacobian[3*j:3*(j+1)] += iclist.ictab[0]['sign2']*ic_jac[6:9]
+                d = iclist.ictab[iic]['i2']
+                jacobian[3*i:3*(i+1)] -= iclist.ictab[iic]['sign2']**0*ic_jac[3*d:3*(d+1)]
+                jacobian[3*j:3*(j+1)] += iclist.ictab[iic]['sign2']**0*ic_jac[3*d:3*(d+1)]
             return q, jacobian
         else:
-            return iclist.ictab[0]['value']
-
-    assert iclist.nic == 1
+            return iclist.ictab[iic]['value']
     x = system.pos.ravel()
     dxs = np.random.normal(0, 1e-4, (100, len(x)))
     check_delta(fn, x, dxs)
@@ -271,9 +272,9 @@ def check_hessian_oneic(dlist, iclist):
             self.dlist.forward()
             self.x0 = np.zeros((dlist.ndelta*3,))
             for i in xrange(dlist.ndelta):
-                self.x0[3*i+0] = self.dlist.deltas[i]['dx']
-                self.x0[3*i+1] = self.dlist.deltas[i]['dy']
-                self.x0[3*i+2] = self.dlist.deltas[i]['dz']
+                self.x0[3*i+0] = self.dlist.deltas[i]['dx'].copy()
+                self.x0[3*i+1] = self.dlist.deltas[i]['dy'].copy()
+                self.x0[3*i+2] = self.dlist.deltas[i]['dz'].copy()
 
         def fun(self, x, do_gradient=False):
             for i in xrange(dlist.ndelta):
