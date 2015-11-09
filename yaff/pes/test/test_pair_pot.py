@@ -36,7 +36,6 @@ from yaff.pes.test.common import check_gpos_part, check_vtens_part
     get_system_2atoms, get_system_quartz, get_system_water
 from yaff.pes.test.common import check_gpos_part, check_vtens_part, check_hess_part
 
-
 from yaff import *
 
 
@@ -1311,26 +1310,33 @@ def check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn
 def test_pair_pot_4113_01WaterWater_eislater1s1scorr():
     system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_eislater1s1scorr()
     check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, 1e-8, do_cores=True)
-
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 def test_pair_pot_4113_01WaterWater_olpslater1s1s():
     system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_olpslater1s1s()
     check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, 1e-8)
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
 def test_pair_pot_4113_01WaterWater_disp68bjdamp():
     system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_disp68bjdamp()
     check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, 1e-8, mult_pop=False)
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
 def test_pair_pot_4113_01WaterWater_chargetransferslater1s1s():
     system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_chargetransferslater1s1s()
     check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, 1e-8)
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> Add charge transfer term proportional to overlap of 1s Slater densities
 #
 # Water derivative tests
 #
@@ -1651,7 +1657,3 @@ def test_pair_pot_eislater1sp1spcorr():
     # Check gradient and virial tensor
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist, symm_vtens=False)
-<<<<<<< HEAD
-=======
->>>>>>> Add electrostatic interaction between Slater dipoles (including gradients)
->>>>>>> Add electrostatic interaction between Slater dipoles (including gradients)

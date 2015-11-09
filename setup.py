@@ -96,6 +96,7 @@ setup(
                      'yaff/pes/truncation.h', 'yaff/pes/truncation.pxd',
                      'yaff/pes/slater.h', 'yaff/pes/slater.pxd',
                      'yaff/pes/constants.h'],
+            extra_compile_args=["-Wstrict-prototypes"],
             include_dirs=[np.get_include()],
         ),
     ],

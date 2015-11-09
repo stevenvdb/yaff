@@ -25,8 +25,8 @@
 #include <math.h>
 #include "constants.h"
 
-double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double Zb, double d, double *g);
+double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double Zb, double d, double *g, double *gg);
 double slaterei_1_0(double a, double b, double Na, double Za, double Nb, double Zb, double d, double *g);
 double slaterei_1_1(double a, double b, double Na, double Za, double Nb, double Zb, double d, double *g);
 double slaterei_1_1_kronecker(double a, double b, double Na, double Za, double Nb, double Zb, double d, double *g);
-double slaterolp_0_0(double a, double b, double d, double *g);
+double slaterolp_0_0(double a, double b, double d, double *g, double *gg);

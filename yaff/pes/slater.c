@@ -27,7 +27,7 @@
 #include "constants.h"
 
 
-double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double Zb, double d, double *g){
+double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double Zb, double d, double *g, double *gg){
   /* Radial part of the electrostatic interaction between two sites separated
      by a distance d.
      The first site contains
@@ -44,6 +44,7 @@ double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double 
   */
   double pot1, pot2, pot3, pot_tmp;
   double g1, g2, g3;
+  double gg1, gg2, gg3;
   // Precompute some powers and other factors
   double da = d/a;
   double db = d/b;
@@ -52,15 +53,18 @@ double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double 
   double a2 = a*a;
   double a3 = a2*a;
   double a4 = a2*a2;
+  double a5 = a4*a;
   double b2 = b*b;
   double b3 = b2*b;
   double b4 = b2*b2;
   // Point-Slater [expa]
   pot1 = -(1.0+0.5*da)*expa/d;
   if (g != NULL) g1 = -(1.0/a+1.0/d)*pot1 - 0.5*expa/d/a;
+  if (gg != NULL) gg1 = -(2.0+2.0*da+da*da+0.5*da*da*da)*expa/d/d/d;
   // Point-Slater [expb]
   pot2 = -(1.0+0.5*db)*expb/d;
   if (g != NULL) g2 = -(1.0/b+1.0/d)*pot2 - 0.5*expb/d/b;
+  if (gg != NULL) gg2 = -(2.0+2.0*db+db*db+0.5*db*db*db)*expb/d/d/d;
   // Discriminate between small and large difference in Slater width
   if (fabs(a-b) > 0.025) {
     // Precompute some more factors
@@ -70,9 +74,11 @@ double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double 
     // Slater-Slater [expa]
     pot3  = -( (a2-3.0*b2)*diff3 + 0.5*diff2*da )*a4*expa/d;
     if (g != NULL) g3 = -(1.0/a+1.0/d)*pot3 - 0.5*diff2*a3*expa/d;
+    if (gg != NULL) gg3 = -( (a2-3.0*b2)*diff3*(2.0+2.0*da+da*da) + 0.5*diff2*da*da*da )*a4*expa/d/d/d;
     // Slater-Slater [expb]
     pot_tmp = -( (3.0*a2-b2)*diff3 + 0.5*diff2*db )*b4*expb/d;
     if (g != NULL) g3 += -(1.0/b+1.0/d)*pot_tmp - 0.5*diff2*b3*expb/d;
+    if (gg != NULL) gg3 += -( (3.0*a2-b2)*diff3*(2.0+2.0*db+db*db) + 0.5*diff2*db*db*db )*b4*expb/d/d/d;
     pot3 += pot_tmp;
   } else {
     // Precompute some more factors
@@ -84,17 +90,21 @@ double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double 
     // 0-th order Taylor [expa]
     pot3  = -(48.0+33.0*da+9.0*da2+da3)/48.0/d*expa;
     if (g != NULL) g3 = -(1.0/d+1.0/a)*pot3 - (33.0+18.0*da+3.0*da2)*expa/48.0/d/a;
+    if (gg != NULL) gg3 = (2.0+2.0*da+da*da)*pot3/d/d - (18.0+6.0*da)*expa/48.0/d/a/a + 2.0*(1.0/d+1.0/a)*(33.0+18.0*da+3.0*da2)*expa/48.0/d/a;
     // 1-st order Taylor [expa]
     pot_tmp = (15.0+15.0*da+6.0*da2+da3)/96.0/a2*expa*delta;
     if (g != NULL) g3 += -1.0/a*pot_tmp + (15.0+12.0*da+3.0*da2)/96.0/a3*expa*delta;
+    if (gg != NULL) gg3 += pot_tmp/a/a + (12.0+6.0*da)/96.0/a4*expa*delta - 2.0*(15.0+12.0*da+3.0*da2)/96.0/a4*expa*delta;
     pot3 += pot_tmp;
     // 2-nd order Taylor [expa]
     pot_tmp = (60.0+60.0*da+15.0*da2-5.0*da3-3.0*da4)/480.0/a3*expa*delta2/2.0;
     if (g != NULL) g3 += -1.0/a*pot_tmp + (60.0+30.0*da-15.0*da2-12.0*da3)/480.0/a4*expa*delta2/2.0;
+    if (gg != NULL) gg3 += pot_tmp/a/a + (30.0-30.0*da-36.0*da2)/480.0/a5*expa*delta2/2.0 - 2.0*(60.0+30.0*da-15.0*da2-12.0*da3)/480.0/a5*expa*delta2/2.0;
     pot3 += pot_tmp;
   }
   double pot = Na*Zb*pot1 + Za*Nb*pot2 + Na*Nb*pot3;
   if (g != NULL) *g = (Na*Zb*g1 + Za*Nb*g2 + Na*Nb*g3)/d;
+  if (gg != NULL) *gg = (Na*Zb*gg1 + Za*Nb*gg2 + Na*Nb*gg3)/d/d;
   return pot;
 }
 
@@ -357,7 +367,7 @@ double slaterei_1_1_kronecker(double a, double b, double Na, double Za, double N
 }
 
 
-double slaterolp_0_0(double a, double b, double d, double *g){
+double slaterolp_0_0(double a, double b, double d, double *g, double *gg){
   /* Radial part of the overlap between two sites separated
      by a distance d. Both sites contain a unit Slater monopole.
      There is a different interface compared to the electrostatic interaction
@@ -382,7 +392,10 @@ double slaterolp_0_0(double a, double b, double d, double *g){
     double pot2 = 0.5*( 4.0*a2*b2*diff3 + b*d*diff2)*exp(-db)/d/M_FOUR_PI;
     pot += pot1 + pot2;
     if (g != NULL) {
-      *g = -pot/d/d-pot1/d/a-pot2/d/b + 0.5*a*diff2*exp(-da)/d/M_FOUR_PI/d + 0.5*b*diff2*exp(-db)/d/M_FOUR_PI/d;
+      *g = 2.0*a2*b2*diff3/M_FOUR_PI/(d*d*d)*(exp(-da)-exp(-db))-pot1/d/a-pot2/d/b;
+    }
+    if (gg != NULL) {
+      *gg = -4.0*a2*b2*diff3/M_FOUR_PI/(d*d*d*d*d)*((1.0+da)*exp(-da)-(1.0+db)*exp(-db)) + pot1/a/a/d/d + pot2/b/b/d/d;
     }
   } else {
     double da2 = da*da;
@@ -393,6 +406,7 @@ double slaterolp_0_0(double a, double b, double d, double *g){
     double a4i = a2i*a2i;
     double a5i = a3i*a2i;
     double a6i = a3i*a3i;
+    double a7i = a4i*a3i;
     pot += (da2+3.0*da+3.0)*exp(-da)*a3i/48.0/M_FOUR_PI;
     pot += (-da3+2.0*da2+9.0*da+9.0)*exp(-da)*a4i/96.0/M_FOUR_PI*delta;
     pot += (3.0*da4-25.0*da3+5.0*da2+90.0*da+90.0)*exp(-da)*a5i/960.0/M_FOUR_PI*delta*delta;
@@ -400,7 +414,13 @@ double slaterolp_0_0(double a, double b, double d, double *g){
         *g  = -pot/d/a;
         *g += (3.0+2.0*da)*exp(-da)*a4i/48.0/M_FOUR_PI/d;
         *g += (9.0+4.0*da-3.0*da2)*exp(-da)*a5i/96.0/M_FOUR_PI*delta/d;
-        *g += (90.0+10.0*da-75.0*da2+12.0*da3)*exp(-da)*a6i/960.0/M_FOUR_PI*delta*delta;
+        *g += (90.0+10.0*da-75.0*da2+12.0*da3)*exp(-da)*a6i/960.0/M_FOUR_PI*delta*delta/d;
+    }
+    if (gg != NULL) {
+        *gg = -2.0*(*g)/a/d - pot/d/d/a/a;
+        *gg += 2.0*exp(-da)*a5i/48.0/M_FOUR_PI/d/d;
+        *gg += (4.0-6.0*da)*exp(-da)*a6i/96.0/M_FOUR_PI*delta/d/d;
+        *gg += (10.0-150.0*da+36.0*da2)*exp(-da)*a7i/960.0/M_FOUR_PI*delta*delta/d/d;
     }
   }
   return pot;
