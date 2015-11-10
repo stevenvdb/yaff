@@ -170,7 +170,7 @@ def get_electrostatic_energy_dd(alpha, system):
     nlist = NeighborList(system)
     scalings = Scalings(system, 0.8, 1.0, 1.0)
     # Construct the ewald real-space potential and part
-    ewald_real_pot = PairPotEIDip(system.charges, system.dipoles, poltens_i, alpha, rcut=5.5/alpha)
+    ewald_real_pot = PairPotEIDip(system.charges, system.dipoles, alpha, rcut=5.5/alpha)
     part_pair_ewald_real = ForcePartPair(system, nlist, scalings, ewald_real_pot)
     assert part_pair_ewald_real.pair_pot.alpha == alpha
     # Construct the ewald reciprocal and correction part

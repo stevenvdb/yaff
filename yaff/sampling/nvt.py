@@ -108,6 +108,7 @@ class NHChain(object):
         self.timestep = timestep
         self.temp = temp
         self.timecon = timecon
+        self.barostat = barostat
         if ndof>0:#avoid setting self.masses with zero gaussian-width in set_ndof if ndof=0
             self.set_ndof(ndof)
 
@@ -162,8 +163,8 @@ class NHChain(object):
 
 
         # iL (G_g - vxi_1 vg) h/4 if barostat is present
-        if barostat is not None:
-            barostat.propagate_press(self.vel[0], self.ndof, ekin, vel, masses, volume, iterative)
+        if self.barostat is not None:
+            self.barostat.propagate_press(self.vel[0], self.ndof, ekin, vel, masses, volume, iterative)
         # iL xi (all) h/2
         self.pos += self.vel*self.timestep/2
         # iL Cv (all) h/2

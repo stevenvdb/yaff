@@ -526,8 +526,8 @@ def get_system_4113_01WaterWater():
     charges = slater_Z + slater_charges
     ffatypes = ['at%03d'%i for i in xrange(len(numbers))]
     system = System(numbers, pos, bonds=bonds, ffatypes=ffatypes,
-                    charges=charges, radii=slater_widths,
-                    valence_charges=slater_charges)
+                    charges=charges, slater1s_widths=slater_widths,
+                    slater1s_N=slater_charges, slater1s_Z=slater_Z)
     return system
 
 
@@ -544,29 +544,3 @@ def get_system_nacl_cubic():
         rvecs=np.identity(3)*(2*r0),
         bonds=[],
     )
-
-
-def get_system_4113_01WaterWater():
-    numbers = np.array([8,1,1,8,1,1])
-    pos = np.array([
-       [-0.702196054, -0.056060256,  0.009942262],
-       [-1.022193224,  0.846775782, -0.011488714],
-       [ 0.257521062,  0.042121496,  0.005218999],
-       [ 2.220871067,  0.026716792,  0.000620476],
-       [ 2.597492682, -0.411663274,  0.766744858],
-       [ 2.593135384, -0.449496183, -0.744782026],
-    ])*angstrom
-    bonds = np.array([[0,1],[0,2],[3,4],[3,5]])
-    slater_widths = np.array([0.41319930026598994, 0.3627838006301428,
-                              0.36506437561248933, 0.41325284559113074,
-                               0.3630690392361035, 0.3630602780887136])
-    slater_charges = np.array([-7.1864406538427446, -0.5757853693582672,
-                               -0.5779228946118505, -7.189537747105163,
-                               -0.575295591836335, -0.5752744321374641])
-    slater_Z = np.array([6.340131543436602,1.0,1.0,6.34008454441325,1.0,1.0])
-    charges = slater_Z + slater_charges
-    ffatypes = ['at%03d'%i for i in xrange(len(numbers))]
-    system = System(numbers, pos, bonds=bonds, ffatypes=ffatypes,
-                    charges=charges, radii=slater_widths,
-                    valence_charges=slater_charges)
-    return system

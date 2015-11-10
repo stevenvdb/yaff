@@ -77,6 +77,7 @@ setup(
     cmdclass = {'build_ext': build_ext, 'install_data': my_install_data},
     data_files=[
         ('share/yaff/test', glob('data/test/*.*')),
+        ('share/yaff', glob('data/*.txt')),
     ] + find_all_data_files('examples'),
     ext_modules=[
         Extension("yaff.pes.ext",

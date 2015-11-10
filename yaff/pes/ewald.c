@@ -177,11 +177,10 @@ double compute_ewald_reci(double *pos, long natom, double *charges,
   return energy;
 }
 
-// TODO: lot of code overlap with original Ewald
-// At the moment the idea is to make separate code for systems with monopoles
-// systems with both monopoles and dipoles.
-// If it turns out that adding zero dipoles does not increase computational cost, this separate
-// code should become the main.
+//TODO: lot of code overlap with original Ewald
+//At the moment the idea is to make separate code for systems with monopoles and dipoles.
+//If it turns out that adding zero dipoles does not increase computational cost, this separate
+//code should become the main.
 double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *dipoles,
                           cell_type* cell, double alpha, long *gmax,
                           double gcut, double *gpos, double *work,
@@ -238,17 +237,12 @@ double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *d
           }
         }
         c = fac1*exp(-ksq*fac2)/ksq;
-        s = ( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2])
-             +(k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) );
-        energy_cd += c*s;
+        s = (cosfac*cosfac+sinfac*sinfac);
+        energy += c*s;
         if (gpos != NULL) {
           x = 2.0*c;
-          cosfac_dd[0] *= x;
-          cosfac_dd[1] *= x;
-          cosfac_dd[2] *= x;
-          sinfac_dd[0] *= x;
-          sinfac_dd[1] *= x;
-          sinfac_dd[2] *= x;
+          cosfac *= x;
+          sinfac *= x;
           for (i=0; i<natom; i++) {
             x = cosfac*work[2*i+1] + sinfac*work[2*i];
             gpos[3*i+0] += k[0]*x;
@@ -257,7 +251,6 @@ double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *d
           }
         }
         if (vtens != NULL) {
-          //TODO: Term still missing here
           c *= 2.0*(1.0/ksq+fac2)*s;
           vtens[0] += c*k[0]*k[0] + cosfac_dd[0]*k[0]*cosfac + sinfac_dd[0]*k[0]*sinfac;
           vtens[4] += c*k[1]*k[1] + cosfac_dd[1]*k[1]*cosfac + sinfac_dd[1]*k[1]*sinfac;
@@ -275,87 +268,6 @@ double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *d
       }
     }
   }
-  //DC interactions
-  energy_dc = 0.0;
-
-
-  //DD interactions
-  energy_dd = 0.0;
-  fac1 = M_FOUR_PI/(*cell).volume;
-  fac2 = 0.25/alpha/alpha;
-  gcut *= M_TWO_PI;
-  gcut *= gcut;
-  for (g0=-gmax[0]; g0 <= gmax[0]; g0++) {
-    for (g1=-gmax[1]; g1 <= gmax[1]; g1++) {
-      for (g2=0; g2 <= gmax[2]; g2++) {
-        if (g2==0) {
-          if (g1<0) continue;
-          if ((g1==0)&&(g0<=0)) continue;
-        }
-        k[0] = (g0*kvecs[0] + g1*kvecs[3] + g2*kvecs[6]);
-        k[1] = (g0*kvecs[1] + g1*kvecs[4] + g2*kvecs[7]);
-        k[2] = (g0*kvecs[2] + g1*kvecs[5] + g2*kvecs[8]);
-        ksq = k[0]*k[0] + k[1]*k[1] + k[2]*k[2];
-        if (ksq > gcut) continue;
-        cosfac_dd[0] = 0.0;
-        cosfac_dd[1] = 0.0;
-        cosfac_dd[2] = 0.0;
-        sinfac_dd[0] = 0.0;
-        sinfac_dd[1] = 0.0;
-        sinfac_dd[2] = 0.0;
-        for (i=0; i<natom; i++) {
-          x = k[0]*pos[3*i] + k[1]*pos[3*i+1] + k[2]*pos[3*i+2];
-          c = cos(x);
-          s = sin(x);
-          cosfac_dd[0] += dipoles[3*i+0]*c;
-          cosfac_dd[1] += dipoles[3*i+1]*c;
-          cosfac_dd[2] += dipoles[3*i+2]*c;
-          sinfac_dd[0] += dipoles[3*i+0]*s;
-          sinfac_dd[1] += dipoles[3*i+1]*s;
-          sinfac_dd[2] += dipoles[3*i+2]*s;
-          if (gpos != NULL) {
-            work[2*i+0] = k[0]*dipoles[3*i+0]*c + k[1]*dipoles[3*i+1]*c + k[2]*dipoles[3*i+2]*c;
-            work[2*i+1] = -k[0]*dipoles[3*i+0]*s- k[1]*dipoles[3*i+1]*s - k[2]*dipoles[3*i+2]*s;
-          }
-        }
-        c = fac1*exp(-ksq*fac2)/ksq;
-        s = ( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2])
-             +(k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) );
-        energy_dd += c*s;
-        if (gpos != NULL) {
-          x = 2.0*c;
-          cosfac_dd[0] *= x;
-          cosfac_dd[1] *= x;
-          cosfac_dd[2] *= x;
-          sinfac_dd[0] *= x;
-          sinfac_dd[1] *= x;
-          sinfac_dd[2] *= x;
-          for (i=0; i<natom; i++) {
-            x = (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2])*work[2*i+1] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2])*work[2*i];
-            gpos[3*i+0] += k[0]*x;
-            gpos[3*i+1] += k[1]*x;
-            gpos[3*i+2] += k[2]*x;
-          }
-        }
-        if (vtens != NULL) {
-          c2 = c*2.0*(1.0/ksq+fac2)*s;
-          vtens[0] += c2*k[0]*k[0] - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[0] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[0])*k[0]/c;
-          vtens[4] += c2*k[1]*k[1] - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[1] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[1])*k[1]/c;
-          vtens[8] += c2*k[2]*k[2] - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[2] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[2])*k[2]/c;
-          x = c2*k[1]*k[0];
-          vtens[1] += x - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[0] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[0])*k[1]/c;
-          vtens[3] += x - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[1] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[1])*k[0]/c;
-          x = c2*k[2]*k[0];
-          vtens[2] += x - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[0] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[0])*k[2]/c;
-          vtens[6] += x - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[2] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[2])*k[0]/c;
-          x = c2*k[2]*k[1];
-          vtens[5] += x - 0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[1] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[1])*k[2]/c;
-          vtens[7] += x -  0.5*( (k[0]*cosfac_dd[0]+k[1]*cosfac_dd[1]+k[2]*cosfac_dd[2]) * cosfac_dd[2] + (k[0]*sinfac_dd[0]+k[1]*sinfac_dd[1]+k[2]*sinfac_dd[2]) * sinfac_dd[2])*k[1]/c;
-        }
-      }
-    }
-  }
-  energy = energy_cc + energy_cd + energy_dc + energy_dd;
   if (vtens != NULL) {
     vtens[0] -= energy;
     vtens[4] -= energy;
@@ -501,6 +413,7 @@ double compute_ewald_corr(double *pos, double *charges,
   return energy;
 }
 
+
 double compute_ewald_corr_dd(double *pos, double *charges, double *dipoles,
                           cell_type *unitcell, double alpha,
                           scaling_row_type *stab, long nstab,
@@ -510,9 +423,6 @@ double compute_ewald_corr_dd(double *pos, double *charges, double *dipoles,
   double fac, fac0, fac1, fac2, fac3, d_2;
   double mui_dot_delta, muj_dot_delta, mui_dot_muj;
   //double pot_cc, pot_cd, pot_dd;
-  g_cart[0] = 0.0;
-  g_cart[1] = 0.0;
-  g_cart[2] = 0.0;
   energy = 0.0;
   g = 0.0;
   fac1 = alpha/M_SQRT_PI;
@@ -523,71 +433,6 @@ double compute_ewald_corr_dd(double *pos, double *charges, double *dipoles,
     energy -= fac1*charges[i]*charges[i];
     //dipoles
     energy -= fac2*( dipoles[3*i+0]*dipoles[3*i+0] + dipoles[3*i+1]*dipoles[3*i+1] + dipoles[3*i+2]*dipoles[3*i+2] );
-  }
-  // Scaling corrections
-  for (k = 0; k < nstab; k++) { // Loop over all pairs that need scaling
-    i = stab[k].a;
-    j = stab[k].b;
-    delta[0] = pos[3*j+0] - pos[3*i+0];
-    delta[1] = pos[3*j+1] - pos[3*i+1];
-    delta[2] = pos[3*j+2] - pos[3*i+2];
-    cell_mic(delta, unitcell);
-    d = sqrt(delta[0]*delta[0] + delta[1]*delta[1] + delta[2]*delta[2]);
-    //Some useful definitions
-    d_2 = 1.0/(d*d);
-    x = alpha*d;
-    fac = (1-stab[i].scale);
-    fac0 = erf(x)/d*fac;
-    fac1 = (    fac0 - M_TWO_DIV_SQRT_PI*alpha*exp(-x*x)*fac)*d_2;
-    fac2 = (3.0*fac1 - 2.0*M_TWO_DIV_SQRT_PI*alpha*alpha*alpha*exp(-x*x)*fac)*d_2;
-    mui_dot_delta = dipoles[3*i+0]*delta[0] + dipoles[3*i+1]*delta[1] + dipoles[3*i+2]*delta[2];
-    muj_dot_delta = dipoles[3*j+0]*delta[0] + dipoles[3*j+1]*delta[1] + dipoles[3*j+2]*delta[2];
-    mui_dot_muj = dipoles[3*i+0]*dipoles[3*j+0] + dipoles[3*i+1]*dipoles[3*j+1] + dipoles[3*i+2]*dipoles[3*j+2];
-    //CC interaction
-    energy -= fac0*charges[j]*charges[i];
-    //CD and DC interaction
-    energy -= fac1*(charges[i]*muj_dot_delta - charges[j]*mui_dot_delta);
-    //DD interaction
-    energy -= (fac1*mui_dot_muj - fac2*mui_dot_delta*muj_dot_delta);
-    if ((gpos != NULL) || (vtens != NULL)) {
-      fac3 = (5.0*fac2 - 4.0*M_TWO_DIV_SQRT_PI*alpha*alpha*alpha*alpha*alpha*exp(-x*x)*fac)*d_2;
-      //CC interaction
-      g  = fac1*charges[j]*charges[i];
-      //CD and DC interaction
-      g += fac2*(charges[i]*muj_dot_delta - charges[j]*mui_dot_delta);
-      //DD interaction
-      g += fac2*mui_dot_muj - fac3*mui_dot_delta*muj_dot_delta;
-      //CD and DC interaction
-      g_cart[0] = fac1*(charges[j]*dipoles[3*i+0]-charges[i]*dipoles[3*j+0]);
-      g_cart[1] = fac1*(charges[j]*dipoles[3*i+1]-charges[i]*dipoles[3*j+1]);
-      g_cart[2] = fac1*(charges[j]*dipoles[3*i+2]-charges[i]*dipoles[3*j+2]);
-      //DD interaction
-      g_cart[0] += fac2*(dipoles[3*i+0]*muj_dot_delta + dipoles[3*j+0]*mui_dot_delta);
-      g_cart[1] += fac2*(dipoles[3*i+1]*muj_dot_delta + dipoles[3*j+1]*mui_dot_delta);
-      g_cart[2] += fac2*(dipoles[3*i+2]*muj_dot_delta + dipoles[3*j+2]*mui_dot_delta);
-    }
-    if (gpos != NULL) {
-      x = delta[0]*g;
-      gpos[3*j+0 ] += x + g_cart[0];
-      gpos[3*i+0 ] -= x + g_cart[0];
-      x = delta[1]*g;
-      gpos[3*j+1 ] += x + g_cart[1];
-      gpos[3*i+1 ] -= x + g_cart[1];
-      x = delta[2]*g;
-      gpos[3*j+2 ] += x + g_cart[2];
-      gpos[3*i+2 ] -= x + g_cart[2];
-    }
-    if (vtens != NULL) {
-      vtens[0] += delta[0]*(delta[0]*g+g_cart[0]);
-      vtens[4] += delta[1]*(delta[1]*g+g_cart[1]);
-      vtens[8] += delta[2]*(delta[2]*g+g_cart[2]);
-      vtens[1] += delta[0]*(delta[1]*g+g_cart[1]);
-      vtens[3] += delta[1]*(delta[0]*g+g_cart[0]);
-      vtens[2] += delta[0]*(delta[2]*g+g_cart[2]);
-      vtens[6] += delta[2]*(delta[0]*g+g_cart[0]);
-      vtens[5] += delta[1]*(delta[2]*g+g_cart[2]);
-      vtens[7] += delta[2]*(delta[1]*g+g_cart[1]);
-    }
   }
   // Scaling corrections
   for (k = 0; k < nstab; k++) { // Loop over all pairs that need scaling

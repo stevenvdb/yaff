@@ -32,8 +32,6 @@ from molmod import angstrom, kcalmol
 from yaff.test.common import get_system_water32, get_system_caffeine, \
     get_system_2atoms, get_system_quartz, get_system_4113_01WaterWater, \
     get_system_water
-from yaff.pes.test.common import check_gpos_part, check_vtens_part
-    get_system_2atoms, get_system_quartz, get_system_water
 from yaff.pes.test.common import check_gpos_part, check_vtens_part, check_hess_part
 
 from yaff import *
@@ -353,7 +351,7 @@ def get_part_water32_14A_eidip():
     # Create the pair_pot and part_pair
     rcut = 14*angstrom
     alpha = 5.5/rcut
-    pair_pot = PairPotEIDip(system.charges, dipoles, poltens_i, alpha, rcut)
+    pair_pot = PairPotEIDip(system.charges, dipoles, alpha, rcut)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     part_pair.nlist.update()
     # The pair function
@@ -398,7 +396,7 @@ def get_part_water_eidip(scalings = [0.5,1.0,1.0],rcut=14.0*angstrom,switch_widt
     if finite:
         pair_pot = PairPotEI(system.charges,alpha, rcut, tr=Switch3(switch_width), radii=system.radii)
     else:
-        pair_pot = PairPotEIDip(system.charges, dipoles, poltens_i, alpha, rcut, tr=Switch3(switch_width), radii=system.radii, radii2=system.radii2)
+        pair_pot = PairPotEIDip(system.charges, dipoles, alpha, rcut, tr=Switch3(switch_width), radii=system.radii, radii2=system.radii2)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     nlist.update()
     #Make a different nlist in case we approximate the point dipoles with charges
@@ -482,7 +480,7 @@ def check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, 
                 energy = fac*pair_fn(a, b, d, delta)
                 check_energy += energy
     #Add dipole creation energy
-    check_energy += 0.5*np.dot( np.transpose(np.reshape( pair_pot.dipoles, (-1,) )) , np.dot( pair_pot.poltens_i, np.reshape( pair_pot.dipoles, (-1,) ) ) )
+    #check_energy += 0.5*np.dot( np.transpose(np.reshape( pair_pot.dipoles, (-1,) )) , np.dot( pair_pot.poltens_i, np.reshape( pair_pot.dipoles, (-1,) ) ) )
     print "energy1 % 18.15f     check_energy % 18.15f     error % 18.15f" %(energy1, check_energy, energy1-check_energy)
     print "energy2 % 18.15f     check_energy % 18.15f     error % 18.15f" %(energy2, check_energy, energy2-check_energy)
     assert abs(energy1 - check_energy) < eps
@@ -565,7 +563,7 @@ def test_pair_pot_eidip_water_setdipoles():
     poltens_i = np.tile( np.diag([1.0,1.0,1.0]) , np.array([system.natom, 1]) )
     system.dipoles = dipoles0
     #Initialize pair potential
-    pair_pot = PairPotEIDip(system.charges, system.dipoles, poltens_i, 0.0, rcut)
+    pair_pot = PairPotEIDip(system.charges, system.dipoles, 0.0, rcut)
     #Check if dipoles are initialized correctly
     assert np.all( pair_pot.dipoles == dipoles0 )
     #Update the dipoles to new values
@@ -1255,7 +1253,7 @@ def get_part_4113_01WaterWater_chargetransferslater1s1s():
     ct_scale = 0.01363842
     width_power = 3.0
     # Make the pair potential
-    pair_pot = PairPotChargeTransferSlater1s1s(system.radii, system.valence_charges, ct_scale, rcut, width_power=width_power)
+    pair_pot = PairPotChargeTransferSlater1s1s(system.slater1s_widths, system.slater1s_N, ct_scale, rcut, width_power=width_power)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     def pair_fn(i, j, R, alpha, beta):
         E = 0.0
@@ -1282,7 +1280,7 @@ def check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn
     # Compute the energy manually
     check_energy = 0.0
     srow = 0
-    core_charges = system.charges - system.valence_charges
+    core_charges = system.charges - system.slater1s_N
     for a in xrange(system.natom):
         # compute the distances in the neighborlist manually and check.
         for b in xrange(a):

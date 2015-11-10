@@ -34,7 +34,8 @@ from molmod.units import parse_unit
 
 from yaff.log import log
 from yaff.pes.ext import PairPotEI, PairPotLJ, PairPotMM3, PairPotExpRep, \
-    PairPotDampDisp, Switch3
+    PairPotDampDisp, Switch3, PairPot, PairPotDisp68BJDamp, PairPotEiSlater1s1sCorr, \
+    PairPotOlpSlater1s1s, PairPotChargeTransferSlater1s1s
 from yaff.pes.ff import ForcePartPair, ForcePartValence, \
     ForcePartEwaldReciprocal, ForcePartEwaldCorrection, \
     ForcePartEwaldNeutralizing
@@ -45,6 +46,7 @@ from yaff.pes.nlist import NeighborList
 from yaff.pes.scaling import Scalings
 from yaff.pes.vlist import Harmonic, Fues, Cross, Cosine, \
     Chebychev1, Chebychev2, Chebychev3, Chebychev4, Chebychev6
+from yaff.context import context
 
 
 __all__ = [
@@ -1258,6 +1260,46 @@ class MEDFFGenerator(NonbondedGenerator):
             assert upar in upar_keys, pardef.complain(None, "has an unknown universal parameter %s" % upar)
         return result
 
+    def construct_dispersion_coeffs(self, atom_table, numbers, ffatypes, ffatype_ids):
+        # Load reference values from isolated atoms
+        c6_table, alpha_table = self.load_isolated_vdw()
+        nffa = ffatypes.shape[0]
+        # Construct matrices
+        c6s = np.zeros((nffa, nffa))
+        c8s = np.zeros((nffa, nffa))
+        rcross = np.zeros((nffa, nffa))
+        for ffa0 in xrange(nffa):
+            N, Z, sigma, alpha0, expr420 = atom_table.get(ffatypes[ffa0])
+            Z0 = numbers[ffatype_ids==ffa0]
+            assert np.all(Z0==Z0[0])
+            Z0 = Z0[0]
+            c60 = c6_table[Z0]*alpha0**2
+            alpha0 *= alpha_table[Z0]
+            for ffa1 in xrange(nffa):
+                N, Z, sigma, alpha1, expr421 = atom_table.get(ffatypes[ffa1])
+                Z1 = numbers[ffatype_ids==ffa1]
+                assert np.all(Z1==Z1[0])
+                Z1 = Z1[0]
+                c61 = c6_table[Z1]*alpha1**2
+                alpha1 *= alpha_table[Z1]
+                c6s[ffa0, ffa1] = 2.0*c60*c61/(alpha1/alpha0*c60+alpha0/alpha1*c61)
+                c8s[ffa0, ffa1] = c6s[ffa0, ffa1]*np.sqrt(expr420*expr421)*np.power(Z0*Z1,0.25)
+                rcross[ffa0, ffa1] = np.power(expr420*expr421,0.25)*np.power(Z0*Z1,0.125)
+        return c6s, c8s, rcross
+
+    def load_isolated_vdw(self):
+        fn = context.get_fn('chu2004.txt')
+        c6_table, alpha_table = {}, {}
+        with open(fn,'r') as f:
+            for line in f:
+                if line.startswith('#'): continue
+                words = line.split()
+                assert len(words)==3
+                Z = int(words[0])
+                c6_table[Z] = float(words[1])
+                alpha_table[Z] = float(words[2])
+        return c6_table, alpha_table
+
     def apply(self, upars, atom_table, scale_table, system, ff_args):
         if system.charges is None:
             system.charges = np.zeros(system.natom)
@@ -1274,42 +1316,70 @@ class MEDFFGenerator(NonbondedGenerator):
         elif log.do_warning and abs(system.slater1s_Z).max() != 0:
             log.warn('Overwriting slater1s Z in system.')
         system.slater1s_Z[:] = 0.0
-        if system.slater1s_sigma is None:
-            system.slater1s_sigma = np.zeros(system.natom)
+        if system.slater1s_widths is None:
+            system.slater1s_widths = np.zeros(system.natom)
         elif log.do_warning and abs(system.slater1s_sigma).max() != 0:
-            log.warn('Overwriting slater1s sigma in system.')
-        system.slater1s_sigma[:] = 0.0
+            log.warn('Overwriting slater1s widths in system.')
+        system.slater1s_widths[:] = 0.0
 
         # compute the charges
         for i in xrange(system.natom):
             pars = atom_table.get(system.get_ffatype(i))
-            if pars is not None:
-                N, Z, sigma, alpha, expr42 = pars
-                system.charges[i] += N+Z
-                system.slater1s_N[i] = N
-                system.slater1s_Z[i] = Z
-                system.slater1s_sigma[i] = sogma
-            elif log.do_warning:
-                log.warn('No MEDFF parameters defined for atom %i with fftype %s.' % (i, system.get_ffatype(i)))
-        return 0.0
-        for i0, i1 in system.iter_bonds():
-            ffatype0 = system.get_ffatype(i0)
-            ffatype1 = system.get_ffatype(i1)
-            if ffatype0 == ffatype1:
-                continue
-            charge_transfer = bond_table.get((ffatype0, ffatype1))
-            if charge_transfer is None:
-                if log.do_warning:
-                    log.warn('No charge transfer parameter for atom pair (%i,%i) with fftype (%s,%s).' % (i0, i1, system.get_ffatype(i0), system.get_ffatype(i1)))
-            else:
-                system.charges[i0] += charge_transfer
-                system.charges[i1] -= charge_transfer
+            if pars is None:
+                raise RuntimeError('No MEDFF parameters defined for atom %i with fftype %s.' % (i, system.get_ffatype(i)))
+            N, Z, sigma, alpha, expr42 = pars
+            system.charges[i] += N+Z
+            system.slater1s_N[i] = N
+            system.slater1s_Z[i] = Z
+            system.slater1s_widths[i] = sigma
 
         # prepare other parameters
         scalings = Scalings(system, scale_table[1], scale_table[2], scale_table[3])
 
         # Setup the electrostatic pars
-        ff_args.add_electrostatic_parts(system, scalings, dielectric)
+        ff_args.add_electrostatic_parts(system, scalings, 1.0)
+        nlist = ff_args.get_nlist(system)
+
+        # Setup Slater corrections to electrostatics
+        # Get the part. It should not exist yet.
+        part_pair = ff_args.get_part_pair(PairPotEiSlater1s1sCorr)
+        if part_pair is not None:
+            raise RuntimeError('Internal inconsistency: the PairPotEiSlater1s1sCorr part should not be present yet.')
+        pair_pot_ei_slater = PairPotEiSlater1s1sCorr(system.slater1s_widths, system.slater1s_N, system.slater1s_Z, ff_args.rcut, tr=ff_args.tr)
+        part_pair_ei_slater = ForcePartPair(system, nlist, scalings, pair_pot_ei_slater)
+        ff_args.parts.append(part_pair_ei_slater)
+
+        # Setup Slater overlap that describes exchange repulsion
+        # Get the part. It should not exist yet.
+        part_pair = ff_args.get_part_pair(PairPotOlpSlater1s1s)
+        if part_pair is not None:
+            raise RuntimeError('Internal inconsistency: the PairPotOlpSlater1s1s part should not be present yet.')
+        pair_pot_ex  = PairPotOlpSlater1s1s(system.slater1s_widths, system.slater1s_N, upars['EXSCALE'],
+                    ff_args.rcut, tr=ff_args.tr)
+        part_pair_ex = ForcePartPair(system, nlist, scalings, pair_pot_ex)
+        ff_args.parts.append(part_pair_ex)
+
+        # Setup Slater overlap that describes charge transfer
+        # Get the part. It should not exist yet.
+        part_pair = ff_args.get_part_pair(PairPotChargeTransferSlater1s1s)
+        if part_pair is not None:
+            raise RuntimeError('Internal inconsistency: the PairPotChargeTransferSlater1s1s part should not be present yet.')
+        pair_pot_ct  = PairPotChargeTransferSlater1s1s(system.slater1s_widths, system.slater1s_N, upars['CTSCALE'],
+                    ff_args.rcut, tr=ff_args.tr, width_power=0.0)
+        part_pair_ct = ForcePartPair(system, nlist, scalings, pair_pot_ct)
+        ff_args.parts.append(part_pair_ct)
+
+        # Setup dispersion part
+        c6s, c8s, rcross = self.construct_dispersion_coeffs(atom_table, system.numbers, system.ffatypes, system.ffatype_ids)
+        # Get the part. It should not exist yet.
+        part_pair = ff_args.get_part_pair(PairPotDisp68BJDamp)
+        if part_pair is not None:
+            raise RuntimeError('Internal inconsistency: the PairPotDisp68BJDamp part should not be present yet.')
+        pair_pot_disp = PairPotDisp68BJDamp(system.ffatype_ids,c6s,c8s,rcross,ff_args.rcut,
+                        c6_scale=upars['C6SCALE'], c8_scale=upars['C8SCALE'],
+                        bj_a=upars['BJA'],bj_b=upars['BJB'], tr=ff_args.tr)
+        part_pair_disp = ForcePartPair(system, nlist, scalings, pair_pot_disp)
+        ff_args.parts.append(part_pair_disp)
 
 
 def apply_generators(system, parameters, ff_args):

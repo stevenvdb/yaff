@@ -1,0 +1,16 @@
+# Isolated atom properties in atomic units taken from:
+# X. Chu and A. Dalgarno, The Journal of Chemical Physics 121, 4083 (2004), URL http://dx.doi.org/10.1063/1.1779576.
+# Atomic number     C6          alpha
+1                   6.5         4.5
+2                   1.46        1.388
+6                   46.6        12.0
+7                   24.2        7.4
+8                   15.6        5.4
+9                   9.5         3.8
+10                  6.4         2.663
+13                  528.0       60.0
+14                  305.0       37.0
+16                  134.0       19.6
+17                  94.6        15.0
+23                  832.0       84.0
+35                  162.0       20.0

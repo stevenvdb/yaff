@@ -46,7 +46,6 @@ def run_example(workdir, command):
         print '+'*80
         print errdata
         print '+'*80
-        assert False
     fn_clean = os.path.join(workdir, 'clean.sh')
     if os.path.isfile(fn_clean):
         assert os.system('cd %s; ./clean.sh &> /dev/null' % workdir) == 0
