@@ -59,7 +59,7 @@ __all__ = [
     'ValenceCrossGenerator', 'CrossGenerator',
 
     'NonbondedGenerator', 'LJGenerator', 'MM3Generator', 'ExpRepGenerator',
-    'DampDispGenerator', 'FixedChargeGenerator',
+    'DampDispGenerator', 'FixedChargeGenerator', 'MEDFFGenerator',
 
     'apply_generators',
 ]
@@ -1182,6 +1182,116 @@ class FixedChargeGenerator(NonbondedGenerator):
                 system.radii[i] = radius
             elif log.do_warning:
                 log.warn('No charge defined for atom %i with fftype %s.' % (i, system.get_ffatype(i)))
+        for i0, i1 in system.iter_bonds():
+            ffatype0 = system.get_ffatype(i0)
+            ffatype1 = system.get_ffatype(i1)
+            if ffatype0 == ffatype1:
+                continue
+            charge_transfer = bond_table.get((ffatype0, ffatype1))
+            if charge_transfer is None:
+                if log.do_warning:
+                    log.warn('No charge transfer parameter for atom pair (%i,%i) with fftype (%s,%s).' % (i0, i1, system.get_ffatype(i0), system.get_ffatype(i1)))
+            else:
+                system.charges[i0] += charge_transfer
+                system.charges[i1] -= charge_transfer
+
+        # prepare other parameters
+        scalings = Scalings(system, scale_table[1], scale_table[2], scale_table[3])
+
+        # Setup the electrostatic pars
+        ff_args.add_electrostatic_parts(system, scalings, dielectric)
+
+
+class MEDFFGenerator(NonbondedGenerator):
+    prefix = 'MEDFF'
+    suffixes = ['UNIT', 'SCALE', 'ATOM', 'UPAR']
+    par_info = [('N', float), ('Z', float), ('SIGMA', float), ('ALPHA', float), ('EXPR42', float)]
+
+    def __call__(self, system, parsec, ff_args):
+        self.check_suffixes(parsec)
+        conversions = self.process_units(parsec['UNIT'])
+        upars = self.process_upars(parsec['UPAR'])
+        atom_table = self.process_atoms(parsec['ATOM'], conversions)
+        scale_table = self.process_scales(parsec['SCALE'])
+        self.apply(upars, atom_table, scale_table, system, ff_args)
+
+    def process_atoms(self, pardef, conversions):
+        result = {}
+        for counter, line in pardef:
+            words = line.split()
+            if len(words) != 6:
+                pardef.complain(counter, 'should have 6 arguments.')
+            ffatype = words[0]
+            if ffatype in result:
+                pardef.complain(counter, 'has an atom type that was already encountered earlier.')
+            try:
+                N = float(words[1])*conversions['N']
+                Z = float(words[2])*conversions['Z']
+                sigma = float(words[3])*conversions['SIGMA']
+                alpha = float(words[4])*conversions['ALPHA']
+                expr42 = float(words[5])*conversions['EXPR42']
+            except ValueError:
+                pardef.complain(counter, 'contains a parameter that can not be converted to a floating point number.')
+            result[ffatype] = N, Z, sigma, alpha, expr42
+        return result
+
+    def process_upars(self, pardef):
+        upar_keys = ['EXSCALE', 'CTSCALE', 'C6SCALE', 'C8SCALE', 'BJA', 'BJB']
+        result = {}
+        for counter, line in pardef:
+            words = line.split()
+            if len(words) != 2:
+                pardef.complain(counter, 'should have 2 arguments')
+            upar = words[0]
+            if upar in result:
+                pardef.complain(counter, 'has a universal parameter that was already encountered earlier')
+            try:
+                result[upar] = float(words[1])
+            except ValueError:
+                pardef.complain(counter, 'contains a universal parameter that can not be converted to a floating point number')
+        if not 'C6SCALE' in result: result['C6SCALE'] = 1.0
+        # Check that we have all the universal parameters we need
+        for upar in upar_keys:
+            assert upar in result, pardef.complain(None, "is missing universal parameter %s" % upar)
+        # Check that we have only the universal parameters that we want
+        for upar in result:
+            assert upar in upar_keys, pardef.complain(None, "has an unknown universal parameter %s" % upar)
+        return result
+
+    def apply(self, upars, atom_table, scale_table, system, ff_args):
+        if system.charges is None:
+            system.charges = np.zeros(system.natom)
+        elif log.do_warning and abs(system.charges).max() != 0:
+            log.warn('Overwriting charges in system.')
+        system.charges[:] = 0.0
+        if system.slater1s_N is None:
+            system.slater1s_N = np.zeros(system.natom)
+        elif log.do_warning and abs(system.slater1s_N).max() != 0:
+            log.warn('Overwriting slater1s N in system.')
+        system.slater1s_N[:] = 0.0
+        if system.slater1s_Z is None:
+            system.slater1s_Z = np.zeros(system.natom)
+        elif log.do_warning and abs(system.slater1s_Z).max() != 0:
+            log.warn('Overwriting slater1s Z in system.')
+        system.slater1s_Z[:] = 0.0
+        if system.slater1s_sigma is None:
+            system.slater1s_sigma = np.zeros(system.natom)
+        elif log.do_warning and abs(system.slater1s_sigma).max() != 0:
+            log.warn('Overwriting slater1s sigma in system.')
+        system.slater1s_sigma[:] = 0.0
+
+        # compute the charges
+        for i in xrange(system.natom):
+            pars = atom_table.get(system.get_ffatype(i))
+            if pars is not None:
+                N, Z, sigma, alpha, expr42 = pars
+                system.charges[i] += N+Z
+                system.slater1s_N[i] = N
+                system.slater1s_Z[i] = Z
+                system.slater1s_sigma[i] = sogma
+            elif log.do_warning:
+                log.warn('No MEDFF parameters defined for atom %i with fftype %s.' % (i, system.get_ffatype(i)))
+        return 0.0
         for i0, i1 in system.iter_bonds():
             ffatype0 = system.get_ffatype(i0)
             ffatype1 = system.get_ffatype(i1)
