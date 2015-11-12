@@ -27,6 +27,7 @@
 
 #include "nlist.h"
 #include "truncation.h"
+#include "switchon.h"
 #include "slater.h"
 
 
@@ -37,6 +38,7 @@ typedef struct {
   pair_fn_type pair_fn;
   double rcut;
   trunc_scheme_type *trunc_scheme;
+  switchon_type *switchon_scheme;
 } pair_pot_type;
 
 typedef struct {
@@ -52,6 +54,7 @@ int pair_pot_ready(pair_pot_type *pair_pot);
 double pair_pot_get_rcut(pair_pot_type *pair_pot);
 void pair_pot_set_rcut(pair_pot_type *pair_pot, double rcut);
 void pair_pot_set_trunc_scheme(pair_pot_type *pair_pot, trunc_scheme_type *trunc_sceme);
+void pair_pot_set_switchon_scheme(pair_pot_type *pair_pot, switchon_type *switchon);
 void pair_data_free(pair_pot_type *pair_pot);
 
 double pair_pot_compute(neigh_row_type *neighs,

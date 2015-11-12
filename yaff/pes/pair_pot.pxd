@@ -26,6 +26,7 @@
 cimport numpy as np
 cimport nlist
 cimport truncation
+cimport switchon
 cimport slater
 
 cdef extern from "pair_pot.h":
@@ -43,6 +44,7 @@ cdef extern from "pair_pot.h":
     double pair_pot_get_rcut(pair_pot_type *pair_pot)
     void pair_pot_set_rcut(pair_pot_type *pair_pot, double rcut)
     void pair_pot_set_trunc_scheme(pair_pot_type *pair_pot, truncation.trunc_scheme_type *trunc_sceme)
+    void pair_pot_set_switchon_scheme(pair_pot_type *pair_pot, switchon.switchon_type *switchon)
     void pair_data_free(pair_pot_type *pair_pot)
 
     double pair_pot_compute(nlist.neigh_row_type* neighs, long nneigh,

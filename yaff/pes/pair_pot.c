@@ -37,6 +37,7 @@ pair_pot_type* pair_pot_new(void) {
     (*result).pair_fn = NULL;
     (*result).rcut = 0.0;
     (*result).trunc_scheme = NULL;
+    (*result).switchon_scheme = NULL;
   }
   return result;
 }
@@ -59,6 +60,10 @@ void pair_pot_set_rcut(pair_pot_type *pair_pot, double rcut) {
 
 void pair_pot_set_trunc_scheme(pair_pot_type *pair_pot, trunc_scheme_type *trunc_scheme) {
   (*pair_pot).trunc_scheme = trunc_scheme;
+}
+
+void pair_pot_set_switchon_scheme(pair_pot_type *pair_pot, switchon_type *switchon) {
+  (*pair_pot).switchon_scheme = switchon;
 }
 
 double get_scaling(scaling_row_type *stab, long a, long b, long *row, long size) {
@@ -115,6 +120,11 @@ double pair_pot_compute(neigh_row_type *neighs,
           if (((*pair_pot).trunc_scheme!=NULL) && (v!=0.0)) {
             v *= (*(*pair_pot).trunc_scheme).trunc_fn(neighs[i].d, (*pair_pot).rcut, (*(*pair_pot).trunc_scheme).par, NULL, NULL);
           }
+          // If a switchon scheme is defined, apply it.
+          if (((*pair_pot).switchon_scheme!=NULL) && (v!=0.0)) {
+            v *= (*(*pair_pot).switchon_scheme).switchon_fn((*(*pair_pot).switchon_scheme).switchon_data,
+                        center_index, other_index, neighs[i].d, NULL, NULL);
+          }
         } else {
           // Call the potential function with vg argument.
           // vg_cart contains the (partial) derivatives of the pair potential to
@@ -136,6 +146,25 @@ double pair_pot_compute(neigh_row_type *neighs,
               h = (*(*pair_pot).trunc_scheme).trunc_fn(neighs[i].d,    (*pair_pot).rcut, (*(*pair_pot).trunc_scheme).par, &hg, NULL);
             } else {
               h = (*(*pair_pot).trunc_scheme).trunc_fn(neighs[i].d,    (*pair_pot).rcut, (*(*pair_pot).trunc_scheme).par, &hg, &hgg);
+            }
+            // chain rule:
+            if (hess!=NULL) vgg = vgg*h + 2*vg*hg/neighs[i].d+v*hgg/neighs[i].d/neighs[i].d;
+            vg = vg*h + v*hg/neighs[i].d;
+            vg_cart[0] = vg_cart[0]*h;
+            vg_cart[1] = vg_cart[1]*h;
+            vg_cart[2] = vg_cart[2]*h;
+            v *= h;
+          }
+          // If a switchon scheme is defined, apply it.
+          // TODO: include vg_cart (not necessary as long as the switchon scheme only depends on distance)
+          if (((*pair_pot).switchon_scheme!=NULL) && ((v!=0.0) || (vg!=0.0) || (hess!=NULL && vgg!=0.0))) {
+            // hg is (a pointer to) the derivative of the truncation function.
+            if (hess==NULL) {
+              h = (*(*pair_pot).switchon_scheme).switchon_fn((*(*pair_pot).switchon_scheme).switchon_data,
+                        center_index, other_index, neighs[i].d, &hg, NULL);
+            } else {
+              h = (*(*pair_pot).switchon_scheme).switchon_fn((*(*pair_pot).switchon_scheme).switchon_data,
+                        center_index, other_index, neighs[i].d, &hg, &hgg);
             }
             // chain rule:
             if (hess!=NULL) vgg = vgg*h + 2*vg*hg/neighs[i].d+v*hgg/neighs[i].d/neighs[i].d;

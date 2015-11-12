@@ -75,7 +75,7 @@ class FFArgs(object):
     '''
     def __init__(self, rcut=18.89726133921252, tr=Switch3(7.558904535685008),
                  alpha_scale=3.5, gcut_scale=1.1, skin=0, smooth_ei=False,
-                 reci_ei='ewald'):
+                 reci_ei='ewald', sw=None):
         """
            **Optional arguments:**
 
@@ -113,6 +113,9 @@ class FFArgs(object):
                 must be one of 'ignore' or 'ewald'. The 'ewald' option is only
                 supported for 3D periodic systems.
 
+           sw
+                Switching function to smoothly turn on pairwise potentials
+
            The actual value of gcut, which depends on both gcut_scale and
            alpha_scale, determines the computational cost of the reciprocal term
            in the Ewald summation. The default values are just examples. An
@@ -130,6 +133,7 @@ class FFArgs(object):
         self.skin = skin
         self.smooth_ei = smooth_ei
         self.reci_ei = reci_ei
+        self.sw = sw
         # arguments for the ForceField constructor
         self.parts = []
         self.nlist = None
@@ -921,7 +925,7 @@ class LJGenerator(NonbondedGenerator):
         if part_pair is not None:
             raise RuntimeError('Internal inconsistency: the LJ part should not be present yet.')
 
-        pair_pot = PairPotLJ(sigmas, epsilons, ff_args.rcut, ff_args.tr)
+        pair_pot = PairPotLJ(sigmas, epsilons, ff_args.rcut, tr=ff_args.tr, sw=ff_args.sw)
         nlist = ff_args.get_nlist(system)
         part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
         ff_args.parts.append(part_pair)
@@ -961,7 +965,7 @@ class MM3Generator(NonbondedGenerator):
         if part_pair is not None:
             raise RuntimeError('Internal inconsistency: the MM3 part should not be present yet.')
 
-        pair_pot = PairPotMM3(sigmas, epsilons, onlypaulis, ff_args.rcut, ff_args.tr)
+        pair_pot = PairPotMM3(sigmas, epsilons, onlypaulis, ff_args.rcut, tr=ff_args.tr, sw=ff_args.sw)
         nlist = ff_args.get_nlist(system)
         part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
         ff_args.parts.append(part_pair)
@@ -1038,7 +1042,9 @@ class ExpRepGenerator(NonbondedGenerator):
 
         pair_pot = PairPotExpRep(
             system.ffatype_ids, amp_cross, b_cross, ff_args.rcut, ff_args.tr,
-            amps, amp_mix, amp_mix_coeff, bs, b_mix, b_mix_coeff,
+            sw=ff_args.sw, amps=amps, amp_mix=amp_mix,
+            amp_mix_coeff=amp_mix_coeff, bs=bs, b_mix=b_mix,
+            b_mix_coeff=b_mix_coeff,
         )
         nlist = ff_args.get_nlist(system)
         part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
@@ -1099,7 +1105,8 @@ class DampDispGenerator(NonbondedGenerator):
         if part_pair is not None:
             raise RuntimeError('Internal inconsistency: the DAMPDISP part should not be present yet.')
 
-        pair_pot = PairPotDampDisp(system.ffatype_ids, c6_cross, b_cross, ff_args.rcut, ff_args.tr, c6s, bs, vols)
+        pair_pot = PairPotDampDisp(system.ffatype_ids, c6_cross, b_cross, ff_args.rcut,
+               tr=ff_args.tr, sw=ff_args.sw, c6s=c6s, bs=bs, vols=vols)
         nlist = ff_args.get_nlist(system)
         part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
         ff_args.parts.append(part_pair)
@@ -1344,7 +1351,7 @@ class MEDFFGenerator(NonbondedGenerator):
         scalings = Scalings(system, scale_table[1], scale_table[2], scale_table[3])
 
         # Setup the electrostatic pars
-        scalings_ei = Scalings(system   , 1.0, 1.0, 1.0)
+        scalings_ei = Scalings(system, 1.0, 1.0, 1.0)
         ff_args.add_electrostatic_parts(system, scalings_ei, 1.0)
         nlist = ff_args.get_nlist(system)
 
@@ -1353,7 +1360,8 @@ class MEDFFGenerator(NonbondedGenerator):
         part_pair = ff_args.get_part_pair(PairPotEiSlater1s1sCorr)
         if part_pair is not None:
             raise RuntimeError('Internal inconsistency: the PairPotEiSlater1s1sCorr part should not be present yet.')
-        pair_pot_ei_slater = PairPotEiSlater1s1sCorr(system.slater1s_widths, system.slater1s_N, system.slater1s_Z, ff_args.rcut, tr=ff_args.tr)
+        pair_pot_ei_slater = PairPotEiSlater1s1sCorr(system.slater1s_widths, system.slater1s_N,
+                 system.slater1s_Z, ff_args.rcut, tr=ff_args.tr, sw=ff_args.sw)
         part_pair_ei_slater = ForcePartPair(system, nlist, scalings, pair_pot_ei_slater)
         ff_args.parts.append(part_pair_ei_slater)
 
@@ -1363,7 +1371,7 @@ class MEDFFGenerator(NonbondedGenerator):
         if part_pair is not None:
             raise RuntimeError('Internal inconsistency: the PairPotOlpSlater1s1s part should not be present yet.')
         pair_pot_ex  = PairPotOlpSlater1s1s(system.slater1s_widths, system.slater1s_N, upars['EXSCALE'],
-                    ff_args.rcut, tr=ff_args.tr)
+                    ff_args.rcut, tr=ff_args.tr, sw=ff_args.sw)
         part_pair_ex = ForcePartPair(system, nlist, scalings, pair_pot_ex)
         ff_args.parts.append(part_pair_ex)
 
@@ -1373,7 +1381,7 @@ class MEDFFGenerator(NonbondedGenerator):
         if part_pair is not None:
             raise RuntimeError('Internal inconsistency: the PairPotChargeTransferSlater1s1s part should not be present yet.')
         pair_pot_ct  = PairPotChargeTransferSlater1s1s(system.slater1s_widths, system.slater1s_N, upars['CTSCALE'],
-                    ff_args.rcut, tr=ff_args.tr, width_power=0.0)
+                    ff_args.rcut, tr=ff_args.tr, sw=ff_args.sw, width_power=0.0)
         part_pair_ct = ForcePartPair(system, nlist, scalings, pair_pot_ct)
         ff_args.parts.append(part_pair_ct)
 
@@ -1385,7 +1393,7 @@ class MEDFFGenerator(NonbondedGenerator):
             raise RuntimeError('Internal inconsistency: the PairPotDisp68BJDamp part should not be present yet.')
         pair_pot_disp = PairPotDisp68BJDamp(system.ffatype_ids,c6s,c8s,rcross,ff_args.rcut,
                         c6_scale=upars['C6SCALE'], c8_scale=upars['C8SCALE'],
-                        bj_a=upars['BJA'],bj_b=upars['BJB'], tr=ff_args.tr)
+                        bj_a=upars['BJA'],bj_b=upars['BJB'], tr=ff_args.tr, sw=ff_args.sw)
         part_pair_disp = ForcePartPair(system, nlist, scalings, pair_pot_disp)
         ff_args.parts.append(part_pair_disp)
 

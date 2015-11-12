@@ -227,7 +227,8 @@ def get_part_water32_4A_exprep(amp_mix, amp_mix_coeff, b_mix, b_mix_coeff):
     rcut = 4*angstrom
     pair_pot = PairPotExpRep(
         system.ffatype_ids, amp_cross, b_cross, rcut, Switch3(2.0),
-        amps, amp_mix, amp_mix_coeff, bs, b_mix, b_mix_coeff,
+        amps=amps, amp_mix=amp_mix, amp_mix_coeff=amp_mix_coeff,
+        bs=bs, b_mix=b_mix, b_mix_coeff=b_mix_coeff,
     )
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # Create a pair function:
@@ -840,7 +841,8 @@ def get_part_caffeine_exprep_5A(amp_mix, amp_mix_coeff, b_mix, b_mix_coeff):
     # Construct the pair potential and part
     pair_pot = PairPotExpRep(
         system.ffatype_ids, amp_cross, b_cross, 5*angstrom, None,
-        amps, amp_mix, amp_mix_coeff, bs, b_mix, b_mix_coeff,
+        amps=amps, amp_mix=amp_mix, amp_mix_coeff=amp_mix_coeff,
+        bs=bs, b_mix=b_mix, b_mix_coeff=b_mix_coeff,
     )
     assert abs(np.diag(pair_pot.amp_cross) - amps).max() < 1e-10
     assert abs(np.diag(pair_pot.b_cross) - bs).max() < 1e-10
@@ -938,7 +940,8 @@ def get_part_caffeine_dampdisp_9A():
     c6_cross = np.zeros((4, 4), float)
     b_cross = np.zeros((4, 4), float)
     # Construct the pair potential and part
-    pair_pot = PairPotDampDisp(system.ffatype_ids, c6_cross, b_cross, 9*angstrom, None, c6s, bs, vols)
+    pair_pot = PairPotDampDisp(system.ffatype_ids, c6_cross, b_cross, 9*angstrom,
+        tr=None, c6s=c6s, bs=bs, vols=vols)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # The pair function
     def pair_fn(i0, i1, d):

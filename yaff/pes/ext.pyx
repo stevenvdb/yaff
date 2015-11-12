@@ -40,6 +40,7 @@ cimport iclist
 cimport vlist
 cimport truncation
 cimport grid
+cimport switchon
 
 from yaff.log import log
 
@@ -53,7 +54,8 @@ __all__ = [
     'PairPotChargeTransferSlater1s1s', 'compute_ewald_reci', 'compute_ewald_reci_dd',
     'compute_ewald_corr', 'compute_ewald_corr_dd', 'dlist_forward',
     'dlist_back', 'iclist_forward', 'iclist_back', 'iclist_jacobian', 'iclist_hessian',
-    'vlist_forward', 'vlist_back', 'vlist_hessian', 'compute_grid3d'
+    'vlist_forward', 'vlist_back', 'vlist_hessian', 'compute_grid3d',
+    'SwitchErrorFunction'
 ]
 
 
@@ -598,30 +600,19 @@ cdef class Switch3(Truncation):
 
 cdef class SwitchOn:
     '''Base class for smoothly switching on of pairwise interactions'''
-    cdef switchon.switch_scheme_type* _c_switch_scheme
+    cdef switchon.switchon_type* _c_switchon
+
+    def __cinit__(self, *args, **kwargs):
+        self._c_switchon = switchon.switchon_new()
+        if self._c_switchon is NULL:
+            raise MemoryError()
 
     def __dealloc__(self):
-        if self._c_switch_scheme is not NULL:
-            switchon.switch_scheme_free(self._c_switch_scheme)
-
-    #def switch_fn(self, double d):
-    #    '''switch_fn(d)
-    #
-    #       Return the switch function and its first and second derivative.
-    #
-    #       **Arguments:**
-    #
-    #       d
-    #            The distance at which the truncation function must be evaluated.
-    #    '''
-    #    cdef double hg
-    #    cdef double hgg
-    #    hg, hgg = 0.0, 0.0
-    #    h = switch.switch_scheme_fn(self._c_switch_scheme, d, &hg, &hgg)
-    #    return h, hg, hgg
+        if self._c_switchon is not NULL:
+            switchon.switchon_free(self._c_switchon)
 
 
-cdef class ErrorFunction(SwitchOn):
+cdef class SwitchErrorFunction(SwitchOn):
     r'''This switching scheme can be used to smoothly switch on a
         pairwise-potential by multiplying it with an error function. Similar
         to the electrostatic interaction of two Gaussian charges, the width of
@@ -637,8 +628,8 @@ cdef class ErrorFunction(SwitchOn):
 
     def __cinit__(self, np.ndarray[double, ndim=1] radii):
         assert radii.flags['C_CONTIGUOUS']
-        switchon.switch_erf_init(self._c_switch_scheme, <double*>radii.data)
-        if not switchon.switch_ready(self._c_switch_scheme):
+        switchon.switchon_data_erf_init(self._c_switchon, <double*>radii.data)
+        if not switchon.switchon_ready(self._c_switchon):
             raise MemoryError()
         self._c_radii = radii
 
@@ -652,6 +643,7 @@ cdef class PairPot:
     '''Base class for the pair potentials'''
     cdef pair_pot.pair_pot_type* _c_pair_pot
     cdef Truncation tr
+    cdef SwitchOn sw
     cdef long _c_hsize
 
     def __cinit__(self, *args, **kwargs):
@@ -683,6 +675,18 @@ cdef class PairPot:
     def get_truncation(self):
         '''Returns the current truncation scheme'''
         return self.tr
+
+    cdef set_switchon(self, SwitchOn sw):
+        '''Set the switchon scheme'''
+        self.sw = sw
+        if sw is None:
+            pair_pot.pair_pot_set_switchon_scheme(self._c_pair_pot, NULL)
+        else:
+            pair_pot.pair_pot_set_switchon_scheme(self._c_pair_pot, sw._c_switchon)
+
+    def get_switchon(self):
+        '''Returns the current switchon scheme'''
+        return self.sw
 
     def compute(self, np.ndarray[nlist.neigh_row_type, ndim=1] neighs,
                 np.ndarray[pair_pot.scaling_row_type, ndim=1] stab,
@@ -795,12 +799,13 @@ cdef class PairPotLJ(PairPot):
 
     def __cinit__(self, np.ndarray[double, ndim=1] sigmas,
                   np.ndarray[double, ndim=1] epsilons, double rcut,
-                  Truncation tr=None):
+                  Truncation tr=None, SwitchOn sw=None):
         assert sigmas.flags['C_CONTIGUOUS']
         assert epsilons.flags['C_CONTIGUOUS']
         assert sigmas.shape[0] == epsilons.shape[0]
         pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
         self.set_truncation(tr)
+        self.set_switchon(sw)
         pair_pot.pair_data_lj_init(self._c_pair_pot, <double*>sigmas.data, <double*>epsilons.data)
         if not pair_pot.pair_pot_ready(self._c_pair_pot):
             raise MemoryError()
@@ -875,7 +880,7 @@ cdef class PairPotMM3(PairPot):
     def __cinit__(self, np.ndarray[double, ndim=1] sigmas,
                   np.ndarray[double, ndim=1] epsilons,
                   np.ndarray[int, ndim=1] onlypaulis, double rcut,
-                  Truncation tr=None):
+                  Truncation tr=None, SwitchOn sw=None):
         assert sigmas.flags['C_CONTIGUOUS']
         assert epsilons.flags['C_CONTIGUOUS']
         assert onlypaulis.flags['C_CONTIGUOUS']
@@ -883,6 +888,7 @@ cdef class PairPotMM3(PairPot):
         assert sigmas.shape[0] == onlypaulis.shape[0]
         pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
         self.set_truncation(tr)
+        self.set_switchon(sw)
         pair_pot.pair_data_mm3_init(self._c_pair_pot, <double*>sigmas.data, <double*>epsilons.data, <int*>onlypaulis.data)
         if not pair_pot.pair_pot_ready(self._c_pair_pot):
             raise MemoryError()
@@ -925,7 +931,7 @@ cdef class PairPotGrimme(PairPot):
 
     def __cinit__(self, np.ndarray[double, ndim=1] r0,
                   np.ndarray[double, ndim=1] c6, double rcut,
-                  Truncation tr=None):
+                  Truncation tr=None, SwitchOn sw=None):
         assert r0.flags['C_CONTIGUOUS']
         assert c6.flags['C_CONTIGUOUS']
         assert r0.shape[0] == c6.shape[0]
@@ -1028,7 +1034,7 @@ cdef class PairPotExpRep(PairPot):
     def __cinit__(self, np.ndarray[long, ndim=1] ffatype_ids not None,
                   np.ndarray[double, ndim=2] amp_cross not None,
                   np.ndarray[double, ndim=2] b_cross not None,
-                  double rcut, Truncation tr=None,
+                  double rcut, Truncation tr=None, SwitchOn sw=None,
                   np.ndarray[double, ndim=1] amps=None, long amp_mix=-1, double amp_mix_coeff=-1,
                   np.ndarray[double, ndim=1] bs=None, long b_mix=-1, double b_mix_coeff=-1):
         assert ffatype_ids.flags['C_CONTIGUOUS']
@@ -1054,6 +1060,7 @@ cdef class PairPotExpRep(PairPot):
         assert (b_cross == b_cross.T).all()
         pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
         self.set_truncation(tr)
+        self.set_switchon(sw)
         pair_pot.pair_data_exprep_init(
             self._c_pair_pot, nffatype, <long*> ffatype_ids.data,
             <double*> amp_cross.data, <double*> b_cross.data
@@ -1159,7 +1166,7 @@ cdef class PairPotLJCross(PairPot):
     def __cinit__(self, np.ndarray[long, ndim=1] ffatype_ids not None,
                   np.ndarray[double, ndim=2] eps_cross not None,
                   np.ndarray[double, ndim=2] sig_cross not None,
-                  double rcut, Truncation tr=None):
+                  double rcut, Truncation tr=None, SwitchOn sw=None):
         assert ffatype_ids.flags['C_CONTIGUOUS']
         assert eps_cross.flags['C_CONTIGUOUS']
         assert sig_cross.flags['C_CONTIGUOUS']
@@ -1171,6 +1178,7 @@ cdef class PairPotLJCross(PairPot):
         assert sig_cross.shape[1] == nffatype
         pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
         self.set_truncation(tr)
+        self.set_switchon(sw)
         pair_pot.pair_data_ljcross_init(
             self._c_pair_pot, nffatype, <long*> ffatype_ids.data,
             <double*> eps_cross.data, <double*> sig_cross.data,
@@ -1269,7 +1277,7 @@ cdef class PairPotDampDisp(PairPot):
     def __cinit__(self, np.ndarray[long, ndim=1] ffatype_ids not None,
                   np.ndarray[double, ndim=2] c6_cross not None,
                   np.ndarray[double, ndim=2] b_cross not None,
-                  double rcut, Truncation tr=None,
+                  double rcut, Truncation tr=None, SwitchOn sw=None,
                   np.ndarray[double, ndim=1] c6s=None,
                   np.ndarray[double, ndim=1] bs=None,
                   np.ndarray[double, ndim=1] vols=None):
@@ -1295,6 +1303,7 @@ cdef class PairPotDampDisp(PairPot):
             self._init_b_cross(nffatype, b_cross, bs)
         pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
         self.set_truncation(tr)
+        self.set_switchon(sw)
         pair_pot.pair_data_dampdisp_init(
             self._c_pair_pot, nffatype, <long*> ffatype_ids.data,
             <double*> c6_cross.data, <double*> b_cross.data,
@@ -1408,7 +1417,7 @@ cdef class PairPotDisp68BJDamp(PairPot):
                   np.ndarray[double, ndim=2] c6_cross not None,
                   np.ndarray[double, ndim=2] c8_cross not None,
                   np.ndarray[double, ndim=2] R_cross not None,
-                  double rcut, Truncation tr=None,
+                  double rcut, Truncation tr=None, SwitchOn sw=None,
                   np.ndarray[double, ndim=1] c6s=None,
                   np.ndarray[double, ndim=1] c8s=None,
                   np.ndarray[double, ndim=1] Rs=None,
@@ -1443,6 +1452,7 @@ cdef class PairPotDisp68BJDamp(PairPot):
             R_cross[mask] = np.sqrt(c8_scale*c8_cross[mask]/c6_cross[mask]/c6_scale)
         pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
         self.set_truncation(tr)
+        self.set_switchon(sw)
         pair_pot.pair_data_disp68bjdamp_init(
             self._c_pair_pot, nffatype, <long*> ffatype_ids.data,
             <double*> c6_cross.data, <double*> c8_cross.data,
@@ -1736,13 +1746,14 @@ cdef class PairPotEiSlater1s1sCorr(PairPot):
 
     def __cinit__(self, np.ndarray[double, ndim=1] slater1s_widths,
                   np.ndarray[double, ndim=1] slater1s_N, np.ndarray[double, ndim=1] slater1s_Z,
-                  double rcut, Truncation tr=None):
+                  double rcut, Truncation tr=None, SwitchOn sw=None):
         assert slater1s_widths.flags['C_CONTIGUOUS']
         assert slater1s_N.flags['C_CONTIGUOUS']
         assert slater1s_Z.flags['C_CONTIGUOUS']
         # Precompute some factors here???
         pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
         self.set_truncation(tr)
+        self.set_switchon(sw)
         pair_pot.pair_data_eislater1s1scorr_init(self._c_pair_pot, <double*>slater1s_widths.data,  <double*>slater1s_N.data,  <double*>slater1s_Z.data)
         if not pair_pot.pair_pot_ready(self._c_pair_pot):
             raise MemoryError()
@@ -1936,13 +1947,14 @@ cdef class PairPotOlpSlater1s1s(PairPot):
 
     def __cinit__(self, np.ndarray[double, ndim=1] slater1s_widths,
                   np.ndarray[double, ndim=1] slater1s_N, double ex_scale,
-                  double rcut, Truncation tr=None, double corr_a=0.0,
-                  double corr_b=0.0, double corr_c=0.0):
+                  double rcut, Truncation tr=None, SwitchOn sw=None,
+                  double corr_a=0.0, double corr_b=0.0, double corr_c=0.0):
         assert slater1s_widths.flags['C_CONTIGUOUS']
         assert slater1s_N.flags['C_CONTIGUOUS']
         # Precompute some factors here???
         pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
         self.set_truncation(tr)
+        self.set_switchon(sw)
         pair_pot.pair_data_olpslater1s1s_init(self._c_pair_pot, <double*>slater1s_widths.data,  <double*>slater1s_N.data,  ex_scale, corr_a, corr_b, corr_c)
         if not pair_pot.pair_pot_ready(self._c_pair_pot):
             raise MemoryError()
@@ -2036,12 +2048,14 @@ cdef class PairPotChargeTransferSlater1s1s(PairPot):
 
     def __cinit__(self, np.ndarray[double, ndim=1] slater1s_widths,
                   np.ndarray[double, ndim=1] slater1s_N, double ct_scale,
-                  double rcut, Truncation tr=None, double width_power=3.0):
+                  double rcut, Truncation tr=None, SwitchOn sw=None,
+                  double width_power=3.0):
         assert slater1s_widths.flags['C_CONTIGUOUS']
         assert slater1s_N.flags['C_CONTIGUOUS']
         # Precompute some factors here???
         pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
         self.set_truncation(tr)
+        self.set_switchon(sw)
         pair_pot.pair_data_chargetransferslater1s1s_init(self._c_pair_pot, <double*>slater1s_widths.data,  <double*>slater1s_N.data, ct_scale, width_power)
         if not pair_pot.pair_pot_ready(self._c_pair_pot):
             raise MemoryError()

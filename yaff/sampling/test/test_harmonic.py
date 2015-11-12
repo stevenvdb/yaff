@@ -77,7 +77,7 @@ def test_bulk_elastic_bks():
     ])
     system.align_cell(lcs)
     ff.update_rvecs(system.cell.rvecs)
-    opt = QNOptimizer(FullCellDOF(ff, gpos_rms=1e-6, grvecs_rms=1e-6))
+    opt = QNOptimizer(FullCellDOF(ff, gpos_rms=1e-6, gcell_rms=1e-6))
     opt.run()
     rvecs0 = system.cell.rvecs.copy()
     vol0 = system.cell.volume
