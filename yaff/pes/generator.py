@@ -1207,7 +1207,7 @@ class FixedChargeGenerator(NonbondedGenerator):
 class MEDFFGenerator(NonbondedGenerator):
     prefix = 'MEDFF'
     suffixes = ['UNIT', 'SCALE', 'ATOM', 'UPAR']
-    par_info = [('N', float), ('Z', float), ('SIGMA', float), ('ALPHA', float), ('EXPR42', float)]
+    par_info = [('N', float), ('Z', float), ('SIGMA', float), ('ALPHA', float), ('EXPR42', float), ('RADIUS', float)]
 
     def __call__(self, system, parsec, ff_args):
         self.check_suffixes(parsec)
@@ -1221,7 +1221,7 @@ class MEDFFGenerator(NonbondedGenerator):
         result = {}
         for counter, line in pardef:
             words = line.split()
-            if len(words) != 6:
+            if len(words) != 7:
                 pardef.complain(counter, 'should have 6 arguments.')
             ffatype = words[0]
             if ffatype in result:
@@ -1232,9 +1232,10 @@ class MEDFFGenerator(NonbondedGenerator):
                 sigma = float(words[3])*conversions['SIGMA']
                 alpha = float(words[4])*conversions['ALPHA']
                 expr42 = float(words[5])*conversions['EXPR42']
+                radius = float(words[6])*conversions['RADIUS']
             except ValueError:
                 pardef.complain(counter, 'contains a parameter that can not be converted to a floating point number.')
-            result[ffatype] = N, Z, sigma, alpha, expr42
+            result[ffatype] = N, Z, sigma, alpha, expr42, radius
         return result
 
     def process_upars(self, pardef):
@@ -1269,14 +1270,14 @@ class MEDFFGenerator(NonbondedGenerator):
         c8s = np.zeros((nffa, nffa))
         rcross = np.zeros((nffa, nffa))
         for ffa0 in xrange(nffa):
-            N, Z, sigma, alpha0, expr420 = atom_table.get(ffatypes[ffa0])
+            N, Z, sigma, alpha0, expr420, radius = atom_table.get(ffatypes[ffa0])
             Z0 = numbers[ffatype_ids==ffa0]
             assert np.all(Z0==Z0[0])
             Z0 = Z0[0]
             c60 = c6_table[Z0]*alpha0**2
             alpha0 *= alpha_table[Z0]
             for ffa1 in xrange(nffa):
-                N, Z, sigma, alpha1, expr421 = atom_table.get(ffatypes[ffa1])
+                N, Z, sigma, alpha1, expr421, radius = atom_table.get(ffatypes[ffa1])
                 Z1 = numbers[ffatype_ids==ffa1]
                 assert np.all(Z1==Z1[0])
                 Z1 = Z1[0]
@@ -1306,6 +1307,11 @@ class MEDFFGenerator(NonbondedGenerator):
         elif log.do_warning and abs(system.charges).max() != 0:
             log.warn('Overwriting charges in system.')
         system.charges[:] = 0.0
+        if system.radii is None:
+            system.radii = np.zeros(system.natom)
+        elif log.do_warning and abs(system.radii).max() != 0:
+            log.warn('Overwriting radii in system.')
+        system.radii[:] = 0.0
         if system.slater1s_N is None:
             system.slater1s_N = np.zeros(system.natom)
         elif log.do_warning and abs(system.slater1s_N).max() != 0:
@@ -1327,17 +1333,19 @@ class MEDFFGenerator(NonbondedGenerator):
             pars = atom_table.get(system.get_ffatype(i))
             if pars is None:
                 raise RuntimeError('No MEDFF parameters defined for atom %i with fftype %s.' % (i, system.get_ffatype(i)))
-            N, Z, sigma, alpha, expr42 = pars
+            N, Z, sigma, alpha, expr42, radius = pars
             system.charges[i] += N+Z
             system.slater1s_N[i] = N
             system.slater1s_Z[i] = Z
             system.slater1s_widths[i] = sigma
+            system.radii[i] = radius
 
         # prepare other parameters
         scalings = Scalings(system, scale_table[1], scale_table[2], scale_table[3])
 
         # Setup the electrostatic pars
-        ff_args.add_electrostatic_parts(system, scalings, 1.0)
+        scalings_ei = Scalings(system   , 1.0, 1.0, 1.0)
+        ff_args.add_electrostatic_parts(system, scalings_ei, 1.0)
         nlist = ff_args.get_nlist(system)
 
         # Setup Slater corrections to electrostatics

@@ -592,6 +592,58 @@ cdef class Switch3(Truncation):
 
 
 #
+# Pair potential truncation schemes
+#
+
+
+cdef class SwitchOn:
+    '''Base class for smoothly switching on of pairwise interactions'''
+    cdef switchon.switch_scheme_type* _c_switch_scheme
+
+    def __dealloc__(self):
+        if self._c_switch_scheme is not NULL:
+            switchon.switch_scheme_free(self._c_switch_scheme)
+
+    #def switch_fn(self, double d):
+    #    '''switch_fn(d)
+    #
+    #       Return the switch function and its first and second derivative.
+    #
+    #       **Arguments:**
+    #
+    #       d
+    #            The distance at which the truncation function must be evaluated.
+    #    '''
+    #    cdef double hg
+    #    cdef double hgg
+    #    hg, hgg = 0.0, 0.0
+    #    h = switch.switch_scheme_fn(self._c_switch_scheme, d, &hg, &hgg)
+    #    return h, hg, hgg
+
+
+cdef class ErrorFunction(SwitchOn):
+    r'''This switching scheme can be used to smoothly switch on a
+        pairwise-potential by multiplying it with an error function. Similar
+        to the electrostatic interaction of two Gaussian charges, the width of
+        the error function is determined by the radii stored in the system object.
+
+        This switching scheme is intented to damp non-bonded potentials at
+        short range instead of just switching them on or off with scaling rules.
+        The width of the error function is determined as follows:
+
+       .. math:: \sigma_{ij} = \sqrt{\sigma_i^2 + \sigma_j^2}.
+    '''
+    cdef np.ndarray _c_radii
+
+    def __cinit__(self, np.ndarray[double, ndim=1] radii):
+        assert radii.flags['C_CONTIGUOUS']
+        switchon.switch_erf_init(self._c_switch_scheme, <double*>radii.data)
+        if not switchon.switch_ready(self._c_switch_scheme):
+            raise MemoryError()
+        self._c_radii = radii
+
+
+#
 # Pair potentials
 #
 
