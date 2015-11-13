@@ -1331,7 +1331,7 @@ class MEDFFGenerator(NonbondedGenerator):
         system.slater1s_Z[:] = 0.0
         if system.slater1s_widths is None:
             system.slater1s_widths = np.zeros(system.natom)
-        elif log.do_warning and abs(system.slater1s_sigma).max() != 0:
+        elif log.do_warning and abs(system.slater1s_widths).max() != 0:
             log.warn('Overwriting slater1s widths in system.')
         system.slater1s_widths[:] = 0.0
 
