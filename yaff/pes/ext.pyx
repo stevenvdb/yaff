@@ -46,7 +46,8 @@ from yaff.log import log
 
 
 __all__ = [
-    'Cell', 'nlist_status_init', 'nlist_build', 'nlist_status_finish',
+    'Cell', 'nlist_status_init', 'nlist_build', 'nlist_build_dd',
+    'nlist_build_dd_omp', 'nlist_status_finish', 'nlist_decompose',
     'nlist_recompute', 'nlist_inc_r', 'Hammer', 'Switch3', 'PairPot',
     'PairPotLJ', 'PairPotMM3', 'PairPotGrimme', 'PairPotExpRep', 'PairPotLJCross',
     'PairPotDampDisp', 'PairPotDisp68BJDamp', 'PairPotEI', 'PairPotEIDip',
@@ -357,15 +358,18 @@ def nlist_status_init(rmax):
        * ``b``: atom index of second atom in pair
        * ``sign``: +1 or -1, to swap the relative vector such that a > b
        * ``nrow``: number of rows consumed
+       * ``neval``: number of distance evaluations, only necessary to assess
+                    efficiency of neighbor list build
     '''
-    result = np.array([0, 0, 0, 0, 0, 1, 0], int)
+    result = np.array([0, 0, 0, 0, 0, 1, 0, 0], int)
     return result
 
 
 def nlist_build(np.ndarray[double, ndim=2] pos, double rcut,
                 np.ndarray[long, ndim=1] rmax,
                 Cell unitcell, np.ndarray[long, ndim=1] status,
-                np.ndarray[nlist.neigh_row_type, ndim=1] neighs):
+                np.ndarray[nlist.neigh_row_type, ndim=1] neighs,
+                long split=-1):
     '''Scan the system for all pairs that have a distance smaller than rcut until the neighs array is filled or all pairs are considered
 
        **Arguments:**
@@ -401,14 +405,129 @@ def nlist_build(np.ndarray[double, ndim=2] pos, double rcut,
     assert rcut > 0
     assert rmax.shape[0] <= 3
     assert rmax.flags['C_CONTIGUOUS']
-    assert status.shape[0] == 7
+    assert status.shape[0] == 8
     assert status.flags['C_CONTIGUOUS']
     assert neighs.flags['C_CONTIGUOUS']
     assert rmax.shape[0] == unitcell.nvec
+    if split==-1: split = len(pos)
     return nlist.nlist_build_low(
         <double*>pos.data, rcut, <long*>rmax.data,
         unitcell._c_cell, <long*>status.data,
-        <nlist.neigh_row_type*>neighs.data, len(pos), len(neighs)
+        <nlist.neigh_row_type*>neighs.data, len(pos), len(neighs), 0, split
+    )
+
+
+def nlist_decompose(np.ndarray[double, ndim=2] pos, Cell unitcell, np.ndarray[long, ndim=1] bin_indexes, np.ndarray[long, ndim=1] order,np.ndarray[long, ndim=1] domains):
+    return nlist.decompose_domain( <double*>pos.data,  unitcell._c_cell, <long*>bin_indexes.data, <long*>order.data, len(pos), <long*>domains.data)
+
+def nlist_build_dd_omp(np.ndarray[double, ndim=2] pos, double rcut,
+                np.ndarray[long, ndim=1] rmax,
+                Cell unitcell, np.ndarray[long, ndim=1] status,
+                np.ndarray[nlist.neigh_row_type, ndim=1] neighs,
+                np.ndarray[long, ndim=1] binsizes, np.ndarray[long, ndim=1] binsizes_cum,
+                nbin,
+                np.ndarray[long, ndim=1] domains, double r_circum):
+    '''Scan the system for all pairs that have a distance smaller than rcut until the neighs array is filled or all pairs are considered
+
+       **Arguments:**
+
+       pos
+            The numpy array with the atomic positions, shape (natom, 3)
+
+       rcut
+            The cutoff radius
+
+       rmax
+            The number of periodic images to visit along each cell vector, shape
+            (nrvec,)
+
+       unitcell
+            An instance of the UnitCell class, describing the periodic boundary
+            conditions.
+
+       status
+            The status array, either obtained from ``nlist_status_init``, or
+            as it was modified by the last call to this function
+
+       neighs
+            The neighbor list array. One element is of the datatype
+            nlist.neigh_row_type.
+
+       **Returns:**
+
+       ``True`` if the neighbor list is complete. ``False`` otherwise
+    '''
+    assert pos.shape[1] == 3
+    assert pos.flags['C_CONTIGUOUS']
+    assert rcut > 0
+    assert rmax.shape[0] <= 3
+    assert rmax.flags['C_CONTIGUOUS']
+    assert status.shape[0]%3 == 0
+    assert status.flags['C_CONTIGUOUS']
+    assert neighs.flags['C_CONTIGUOUS']
+    assert rmax.shape[0] == unitcell.nvec
+    assert unitcell.nvec == 3
+
+    return nlist.nlist_domain_decomposition_omp(
+        <double*>pos.data, rcut, <long*>rmax.data,
+        unitcell._c_cell, <long*>status.data,
+        <nlist.neigh_row_type*>neighs.data, len(pos), len(neighs), nbin, <long*>binsizes.data, <long*>binsizes_cum.data,
+        <long*>domains.data, r_circum, status.shape[0]/3
+    )
+
+def nlist_build_dd(np.ndarray[double, ndim=2] pos, double rcut,
+                np.ndarray[long, ndim=1] rmax,
+                Cell unitcell, np.ndarray[long, ndim=1] status,
+                np.ndarray[nlist.neigh_row_type, ndim=1] neighs,
+                np.ndarray[long, ndim=1] binsizes, np.ndarray[long, ndim=1] binsizes_cum,
+                np.ndarray[long, ndim=1] ijstart, nbin,
+                np.ndarray[long, ndim=1] domains, double r_circum):
+    '''Scan the system for all pairs that have a distance smaller than rcut until the neighs array is filled or all pairs are considered
+
+       **Arguments:**
+
+       pos
+            The numpy array with the atomic positions, shape (natom, 3)
+
+       rcut
+            The cutoff radius
+
+       rmax
+            The number of periodic images to visit along each cell vector, shape
+            (nrvec,)
+
+       unitcell
+            An instance of the UnitCell class, describing the periodic boundary
+            conditions.
+
+       status
+            The status array, either obtained from ``nlist_status_init``, or
+            as it was modified by the last call to this function
+
+       neighs
+            The neighbor list array. One element is of the datatype
+            nlist.neigh_row_type.
+
+       **Returns:**
+
+       ``True`` if the neighbor list is complete. ``False`` otherwise
+    '''
+    assert pos.shape[1] == 3
+    assert pos.flags['C_CONTIGUOUS']
+    assert rcut > 0
+    assert rmax.shape[0] <= 3
+    assert rmax.flags['C_CONTIGUOUS']
+    assert status.shape[0] == 8
+    assert status.flags['C_CONTIGUOUS']
+    assert neighs.flags['C_CONTIGUOUS']
+    assert rmax.shape[0] == unitcell.nvec
+    assert unitcell.nvec == 3
+
+    return nlist.nlist_domain_decomposition(
+        <double*>pos.data, rcut, <long*>rmax.data,
+        unitcell._c_cell, <long*>status.data,
+        <nlist.neigh_row_type*>neighs.data, len(pos), len(neighs), nbin, <long*>binsizes.data, <long*>binsizes_cum.data,
+        <long*>ijstart.data, <long*>domains.data, r_circum
     )
 
 
@@ -419,7 +538,7 @@ def nlist_status_finish(status):
 
        Returns the number of rows generated by the neighbor list algorithm
     '''
-    return status[-1]
+    return status[-2]
 
 
 def nlist_recompute(np.ndarray[double, ndim=2] pos,
@@ -1681,7 +1800,6 @@ cdef class PairPotEIDip(PairPot):
         E = PairPot.compute(self, neighs, stab, gpos, vtens, hess, nneigh)
         #E += 0.5*np.dot( np.transpose(np.reshape( self._c_dipoles, (-1,) )) , np.dot( self.poltens_i, np.reshape( self._c_dipoles, (-1,) ) ) )
         return E
-
 
     def log(self):
         '''Print suitable initialization info on screen.'''

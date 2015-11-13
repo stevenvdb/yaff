@@ -25,42 +25,45 @@
 
 import numpy as np
 
+from molmod.minimizer import check_delta
 from yaff import *
-from yaff.sampling.test.common import get_ff_bks
+from yaff.sampling.test.common import get_ff_bks, get_ff_graphene, \
+    get_ff_polyethylene, get_ff_nacl
 
-def test_check_delta_cartesian():
+
+def test_delta_cartesian():
     dof = CartesianDOF(get_ff_bks())
     dof.check_delta()
 
 
-def test_check_delta_cartesian_partial():
+def test_delta_cartesian_partial():
     dof = CartesianDOF(get_ff_bks(), select=[0, 1, 2])
     dof.check_delta()
 
 
-def test_check_delta_full_cell():
-    ff = get_ff_bks()
-    dof = FullCellDOF(ff)
+def check_delta_cell(ff, DOFClass, kwargs):
+    dof = DOFClass(ff, **kwargs)
     dof.check_delta()
     zero = np.zeros(dof.ndof, dtype=bool)
-    zero[:9] = True
+    zero[:dof.ncelldof] = True
     dof.check_delta(zero=zero)
     dof.check_delta(zero=~zero)
-    dof = FullCellDOF(ff, do_frozen=True)
+    kwargs['do_frozen'] = True
+    dof = DOFClass(ff, **kwargs)
     dof.check_delta()
 
 
-def test_check_delta_iso_cell():
-    ff = get_ff_bks()
-    dof = IsoCellDOF(ff)
-    dof.check_delta()
-    zero = np.zeros(dof.ndof, dtype=bool)
-    zero[:1] = True
-    dof.check_delta(zero=zero)
-    dof.check_delta(zero=~zero)
-    dof = IsoCellDOF(ff, do_frozen=True)
-    dof.check_delta()
+def check_cell_jacobian(ff, DOFClass, kwargs):
+    kwargs['do_frozen'] = True
+    dof = DOFClass(ff, **kwargs)
 
+    def fun(celldofs, do_gradient=False):
+        rvecs = dof._cellvars_to_rvecs(dof._expand_celldofs(celldofs))
+        if do_gradient:
+            dof._update(celldofs)
+            return rvecs.ravel(), dof._get_celldofs_jacobian(celldofs)
+        else:
+            return rvecs.ravel()
 
 def test_check_delta_aniso_cell():
     ff = get_ff_bks()

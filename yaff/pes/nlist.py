@@ -43,10 +43,10 @@ import numpy as np
 
 from yaff.log import log, timer
 from yaff.pes.ext import nlist_status_init, nlist_status_finish, nlist_build, \
-    nlist_recompute
+    nlist_recompute, nlist_decompose, nlist_build_dd_omp
 
 
-__all__ = ['NeighborList']
+__all__ = ['NeighborList','DDNeighborList']
 
 
 neigh_dtype = [
@@ -164,6 +164,8 @@ class NeighborList(object):
                 self.nneigh = nlist_status_finish(status)
                 if log.do_debug:
                     log('Rebuilt, size = %i' % self.nneigh)
+                    log('Distance evaluations = %i' % status[-1])
+                    log('Efficiency = %4.1f%%' % (float(self.nneigh)/status[-1]*100.0))
                 # 4) store the current state to check in future calls if we
                 #    need to do a rebuild or a recompute.
                 self._checkpoint()
@@ -328,3 +330,84 @@ class NeighborList(object):
                 ))
                 wrong = True
         assert not wrong
+
+
+class DDNeighborList(NeighborList):
+    def initialize(self):
+        NeighborList.update(self)
+        self.nneigh_max = (3*self.nneigh)/2
+
+    def update(self, nthreads=4):
+        #TODO Figure out nthreads automatically
+        #TODO Allow specification and detection of domains
+        if len(self.neighs)==10: self.initialize()
+        with log.section('DDNLIST'), timer.section('DDNlist'):
+            assert self.rcut > 0
+            if self._need_rebuild():
+                # Initialize domain decomposition
+                bin_indexes = np.zeros(self.system.natom, dtype=long)
+                order = np.zeros(self.system.natom, dtype=long)
+                domains = np.array([2,2,2], dtype=long)
+                r_circum = nlist_decompose(self.system.pos, self.system.cell, bin_indexes, order, domains)
+                nbins = np.prod(domains)
+                binsizes = np.zeros(nbins,dtype=long)
+                binsizes_cum = np.zeros(nbins,dtype=long)
+                for i in xrange(nbins):
+                    binsizes[i] = np.sum(bin_indexes==i)
+                    binsizes_cum[i] = np.sum(bin_indexes<i)
+                newpos = self.system.pos[order].copy()
+                self.neighs = np.empty(self.nneigh_max, dtype=neigh_dtype)
+                status = np.zeros(3*nthreads,dtype=long)
+                self.nneigh = 0
+                ntotal = 0
+                while True:
+                    done = nlist_build_dd_omp(newpos, self.rcut+self.skin, self.rmax,
+                        self.system.cell, status, self.neighs[:], binsizes,
+                        binsizes_cum, nbins, domains, r_circum )
+                    self.nneigh = nlist_status_finish(status)
+                    # Check if we succeeded succesfully
+                    if done:
+                        break
+                    # ... if not simply provide more memory for neighs
+                    self.nneigh_max = (len(self.neighs)*3)/2
+                    self.neighs = np.empty(self.nneigh_max, dtype=neigh_dtype)
+                # Use the ordered atoms in the final list
+                new_neighs = np.empty((len(self.neighs)*3)/2, dtype=neigh_dtype)
+                for i in xrange(nthreads):
+                    start0 = status[3*i]
+                    start1 = np.sum(status[1:3*i+1:3])
+                    new_neighs[start1:start1+status[3*i+1]] = self.neighs[start0:start0+status[3*i+1]]
+                self.neighs = new_neighs
+                self.nneigh = np.sum(status[1::3])
+                ntotal = np.sum(status[2::3])
+                with timer.section('DDNlist overhead'):
+                    self.neighs[:self.nneigh]['a'] = order[self.neighs[:self.nneigh]['a']]
+                    self.neighs[:self.nneigh]['b'] = order[self.neighs[:self.nneigh]['b']]
+                    #TODO: Find out how expensive this is...
+                    # Find cases where a<b and r=0,0,0
+                    """
+                    switch = 1*(self.neighs[:self.nneigh]['a']<self.neighs[:self.nneigh]['b']) \
+                    + 1*(self.neighs[:self.nneigh]['r0']==0) + 1*(self.neighs[:self.nneigh]['r1']==0) \
+                    + 1*(self.neighs[:self.nneigh]['r2']==0)
+                    switch = np.where(switch==4)[0]
+                    tmp = self.neighs[:self.nneigh]['a'][switch].copy()
+                    self.neighs[:self.nneigh]['a'][switch] = self.neighs[:self.nneigh]['b'][switch]
+                    self.neighs[:self.nneigh]['b'][switch] = tmp
+                    self.neighs[:self.nneigh]['dx'][switch] *= -1
+                    self.neighs[:self.nneigh]['dy'][switch] *= -1
+                    self.neighs[:self.nneigh]['dz'][switch] *= -1
+                    """
+                if log.do_debug:
+                    log('Rebuilt, size = %i' % self.nneigh)
+                    log('Distance evaluations = %i' % ntotal)
+                    log('Efficiency = %4.1f%%' % (float(self.nneigh)/ntotal*100.0))
+                # 4) store the current state to check in future calls if we
+                #    need to do a rebuild or a recompute.
+                self._checkpoint()
+                self.rebuild_next = False
+            else:
+                # just *recompute* the deltas and the distance in the
+                # neighborlist
+                nlist_recompute(self.system.pos, self._pos_old, self.system.cell, self.neighs[:self.nneigh])
+                if log.do_debug:
+                    log('Recomputed')

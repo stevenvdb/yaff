@@ -549,7 +549,6 @@ def make_system_finite_dipoles(system, dipoles, eps=0.05*angstrom):
         masses=newsystem['masses'] )
 
 
-
 def test_pair_pot_eidip_water_setdipoles():
     # '''Test if we can modify dipoles of PairPotEIDip object'''
     #Setup simple system
@@ -591,6 +590,7 @@ def test_pair_pot_eidip_water():
     check_pair_pot_water(system, nlist, scalings, part_pair, pair_pot, pair_fn, 1.0e-12)
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist, symm_vtens=False)
+
 
 def make_system_finite_dipoles(system, dipoles, eps=0.05*angstrom):
     '''

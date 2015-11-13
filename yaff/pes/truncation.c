@@ -44,7 +44,7 @@ double hammer(double d, double rcut, double tau, double *g, double *gg) {
 
 trunc_scheme_type* hammer_new(double tau) {
   trunc_scheme_type* result;
-  result = malloc(sizeof(trunc_scheme_type));
+  result = (trunc_scheme_type*)malloc(sizeof(trunc_scheme_type));
   if (result != NULL) {
     (*result).trunc_fn = hammer;
     (*result).par = tau;
@@ -82,7 +82,7 @@ double switch3(double d, double rcut, double width, double *g, double *gg) {
 
 trunc_scheme_type* switch3_new(double width) {
   trunc_scheme_type* result;
-  result = malloc(sizeof(trunc_scheme_type));
+  result = (trunc_scheme_type*)malloc(sizeof(trunc_scheme_type));
   if (result != NULL) {
     (*result).trunc_fn = switch3;
     (*result).par = width;

@@ -34,7 +34,19 @@ cdef extern from "nlist.h":
 
     bint nlist_build_low(double *pos, double rcut, long *rmax,
                          cell.cell_type* cell, long *nlist_status,
-                         neigh_row_type *neighs, long pos_size, long nneigh)
+                         neigh_row_type *neighs, long amax, long nneigh, long bmin, long bmax)
+
+    double decompose_domain(double *pos, cell.cell_type *unitcell, long *bin_indexes, long *order, long natom, long *domains)
+
+    bint nlist_domain_decomposition_omp(double *pos, double rcut, long *rmax,
+                         cell.cell_type* cell, long *nlist_status,
+                         neigh_row_type *neighs, long pos_size, long nneigh, long nbin, long *binsizes, long *binsizes_cum,
+                         long *domains, double r_circum, long nthreads)
+
+    bint nlist_domain_decomposition(double *pos, double rcut, long *rmax,
+                         cell.cell_type* cell, long *nlist_status,
+                         neigh_row_type *neighs, long pos_size, long nneigh, long nbin, long *binsizes, long *binsizes_cum,
+                    long *ijstart, long *domains, double r_circum)
 
     void nlist_recompute_low(double *pos, double *pos_old, cell.cell_type*
                              unitcell, neigh_row_type *neighs, long nneigh)

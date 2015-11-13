@@ -20,22 +20,33 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>
 //
 //--
+#include "pair_pot.h"
+#include "nlist.h"
+#include <vector>
+#include <map>
 
+#ifndef SPLINEPOT_H
+#define SPLINEPOT_H
 
-#ifndef YAFF_VLIST_H
-#define YAFF_VLIST_H
-
-#include "iclist.h"
-
-typedef struct {
-  long kind;
-  double par0, par1, par2, par3;//, par4, par5;
-  long ic0, ic1;//, ic2;
-  double energy;
-} vlist_row_type;
-
-double vlist_forward(iclist_row_type* ictab, vlist_row_type* vtab, long nv);
-void vlist_back(iclist_row_type* ictab, vlist_row_type* vtab, long nv);
-void vlist_hessian(iclist_row_type* ictab, vlist_row_type* vtab, long nv, long nic, double* hessian);
+class SplinePot {
+    private:
+        double * r;
+        double * phi;
+        double * dphi;
+        long npoints;
+        double first_x;
+        double last_x;
+        double alpha;
+        std::map<long, double> mymap;
+    public:
+        long nffa;
+        long *ffatype_ids;
+        explicit SplinePot(std::size_t n, long *ffatype_ids, long nffa, double *r, double *phi, double *dphi, long npoints, scaling_row_type *stab,
+                        long nstab, long natom);
+        double eval(double x, long index);
+        double eval_deriv(double x, long index);
+        double spline_pot_compute (neigh_row_type *neighs,
+                        long nneigh, double *gpos, double* vtens, long ndof, long natom);
+};
 
 #endif

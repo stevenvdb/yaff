@@ -29,6 +29,7 @@
 #endif
 
 #include "grid.h"
+#include <math.h>
 
 
 double compute_grid3d(double* center, cell_type *cell, double* egrid, long* shape) {

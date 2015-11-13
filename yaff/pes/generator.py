@@ -42,7 +42,7 @@ from yaff.pes.ff import ForcePartPair, ForcePartValence, \
 from yaff.pes.iclist import Bond, BendAngle, BendCos, \
     UreyBradley, DihedAngle, DihedCos, OopAngle, OopMeanAngle, OopCos, \
     OopMeanCos, OopDist
-from yaff.pes.nlist import NeighborList
+from yaff.pes.nlist import NeighborList, DDNeighborList
 from yaff.pes.scaling import Scalings
 from yaff.pes.vlist import Harmonic, Fues, Cross, Cosine, \
     Chebychev1, Chebychev2, Chebychev3, Chebychev4, Chebychev6
@@ -75,7 +75,7 @@ class FFArgs(object):
     '''
     def __init__(self, rcut=18.89726133921252, tr=Switch3(7.558904535685008),
                  alpha_scale=3.5, gcut_scale=1.1, skin=0, smooth_ei=False,
-                 reci_ei='ewald', sw=None):
+                 reci_ei='ewald', sw=None, dd=False):
         """
            **Optional arguments:**
 
@@ -123,6 +123,9 @@ class FFArgs(object):
            some tuning. Dimensionless scaling parameters are used to make sure
            that the numerical errors do not depend too much on the real space
            cutoff and the system size.
+
+            dd
+                Use domain decomposition to construct neighbor lists
         """
         if reci_ei not in ['ignore', 'ewald']:
             raise ValueError('The reci_ei option must be one of \'ignore\' or \'ewald\'.')
@@ -134,13 +137,17 @@ class FFArgs(object):
         self.smooth_ei = smooth_ei
         self.reci_ei = reci_ei
         self.sw = sw
+        self.dd = dd
         # arguments for the ForceField constructor
         self.parts = []
         self.nlist = None
 
     def get_nlist(self, system):
         if self.nlist is None:
-            self.nlist = NeighborList(system, self.skin)
+            if self.dd:
+                self.nlist = DDNeighborList(system, self.skin)
+            else:
+                self.nlist = NeighborList(system, self.skin)
         return self.nlist
 
     def get_part(self, ForcePartClass):

@@ -436,6 +436,8 @@ class System(object):
                         'slater1s_widths', 'slater1s_N', 'slater1s_Z', 'masses',
                         'ffatype_ids', 'bonds', 'rvecs', 'charges', 'masses','radii',
                         'dipoles','radii2',
+                        'ffatype_ids', 'bonds', 'rvecs', 'charges', 'radii',
+                        'dipoles','radii2','masses',
                     ]
                     for key, value in load_chk(fn).iteritems():
                         if key in allowed_keys:

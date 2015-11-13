@@ -27,7 +27,7 @@
 #include "cell.h"
 
 cell_type* cell_new(void) {
-  return malloc(sizeof(cell_type));
+  return (cell_type*)malloc(sizeof(cell_type));
 }
 
 void cell_free(cell_type* cell) {

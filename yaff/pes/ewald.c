@@ -58,17 +58,18 @@ double compute_ewald_reci(double *pos, long natom, double *charges,
         if (ksq > gcut) continue;
         cosfac = 0.0;
         sinfac = 0.0;
-        for (i=0; i<natom; i++) {
-          x = k[0]*pos[3*i] + k[1]*pos[3*i+1] + k[2]*pos[3*i+2];
-          c = charges[i]*cos(x);
-          s = charges[i]*sin(x);
-          cosfac += c;
-          sinfac += s;
-          if (gpos != NULL) {
-            work[2*i] = c;
-            work[2*i+1] = -s;
+        #pragma omp parallel for reduction(+:cosfac, sinfac) private(x, c, s) schedule(static)
+          for (i=0; i<natom; i++) {
+            x = k[0]*pos[3*i] + k[1]*pos[3*i+1] + k[2]*pos[3*i+2];
+            c = charges[i]*cos(x);
+            s = charges[i]*sin(x);
+            cosfac += c;
+            sinfac += s;
+            if (gpos != NULL) {
+              work[2*i] = c;
+              work[2*i+1] = -s;
+            }
           }
-        }
         c = fac1*exp(-ksq*fac2)/ksq;
         s = (cosfac*cosfac+sinfac*sinfac);
         energy += c*s;
@@ -176,6 +177,7 @@ double compute_ewald_reci(double *pos, long natom, double *charges,
   energy *= dielectric_factor;
   return energy;
 }
+
 
 //TODO: lot of code overlap with original Ewald
 //At the moment the idea is to make separate code for systems with monopoles and dipoles.

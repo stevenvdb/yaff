@@ -28,10 +28,13 @@
 #include "pair_pot.h"
 #include "slater.h"
 
+#include <stdio.h>
+#include <map>
+#include <unordered_map>
 
 pair_pot_type* pair_pot_new(void) {
   pair_pot_type* result;
-  result = malloc(sizeof(pair_pot_type));
+  result = (pair_pot_type*)malloc(sizeof(pair_pot_type));
   if (result != NULL) {
     (*result).pair_data = NULL;
     (*result).pair_fn = NULL;
@@ -91,7 +94,7 @@ double pair_pot_compute(neigh_row_type *neighs,
                         double *gpos, double* vtens, double* hess,
                         long hsize) {
   long i, srow, center_index, other_index;
-  double s, energy, v, vg, vgg, h, hg, hgg, hh, rmin2;
+  double s, energy, v, vg, vgg, h, hg, hgg, hh, rmin2, s2;
   double delta[3], vg_cart[3];
   energy = 0.0;
   // Reset the row counter for the scaling.
@@ -99,6 +102,7 @@ double pair_pot_compute(neigh_row_type *neighs,
   // Compute the interactions.
   for (i=0; i<nneigh; i++) {
     // Find the scale
+    // TODO use a map here to get the scale, similarly to splinepot.cpp
     if (neighs[i].d < (*pair_pot).rcut) {
       center_index = neighs[i].a;
       other_index = neighs[i].b;
@@ -279,7 +283,7 @@ void pair_data_free(pair_pot_type *pair_pot) {
 
 void pair_data_lj_init(pair_pot_type *pair_pot, double *sigma, double *epsilon) {
   pair_data_lj_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_lj_type));
+  pair_data = (pair_data_lj_type*)malloc(sizeof(pair_data_lj_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
     (*pair_pot).pair_fn = pair_fn_lj;
@@ -322,7 +326,7 @@ double pair_fn_lj(void *pair_data, long center_index, long other_index, double d
 
 void pair_data_mm3_init(pair_pot_type *pair_pot, double *sigma, double *epsilon, int *onlypauli) {
   pair_data_mm3_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_mm3_type));
+  pair_data = (pair_data_mm3_type*)malloc(sizeof(pair_data_mm3_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
     (*pair_pot).pair_fn = pair_fn_mm3;
@@ -375,7 +379,7 @@ double pair_fn_mm3(void *pair_data, long center_index, long other_index, double 
 
 void pair_data_grimme_init(pair_pot_type *pair_pot, double *r0, double *c6) {
   pair_data_grimme_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_grimme_type));
+  pair_data = (pair_data_grimme_type*)malloc(sizeof(pair_data_grimme_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
     (*pair_pot).pair_fn = pair_fn_grimme;
@@ -414,7 +418,7 @@ double pair_fn_grimme(void *pair_data, long center_index, long other_index, doub
 
 void pair_data_exprep_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *amp_cross, double *b_cross) {
   pair_data_exprep_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_exprep_type));
+  pair_data = (pair_data_exprep_type*)malloc(sizeof(pair_data_exprep_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
     (*pair_pot).pair_fn = pair_fn_exprep;
@@ -448,7 +452,7 @@ bail:
 
 void pair_data_ljcross_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *eps_cross, double *sig_cross) {
   pair_data_ljcross_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_ljcross_type));
+  pair_data = (pair_data_ljcross_type*)malloc(sizeof(pair_data_ljcross_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
     (*pair_pot).pair_fn = pair_fn_ljcross;
@@ -482,7 +486,7 @@ double pair_fn_ljcross(void *pair_data, long center_index, long other_index, dou
 
 void pair_data_dampdisp_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *c6_cross, double *b_cross) {
   pair_data_dampdisp_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_dampdisp_type));
+  pair_data = (pair_data_dampdisp_type*)malloc(sizeof(pair_data_dampdisp_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
     (*pair_pot).pair_fn = pair_fn_dampdisp;
@@ -558,7 +562,7 @@ double pair_fn_dampdisp(void *pair_data, long center_index, long other_index, do
 
 void pair_data_disp68bjdamp_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *c6_cross, double *c8_cross, double *R_cross, double c6_scale, double c8_scale, double bj_a, double bj_b) {
   pair_data_disp68bjdamp_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_disp68bjdamp_type));
+  pair_data = (pair_data_disp68bjdamp_type*)malloc(sizeof(pair_data_disp68bjdamp_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
     (*pair_pot).pair_fn = pair_fn_disp68bjdamp;
@@ -621,7 +625,7 @@ double pair_data_disp68bjdamp_get_bj_b(pair_pot_type *pair_pot){
 
 void pair_data_ei_init(pair_pot_type *pair_pot, double *charges, double alpha, double dielectric, double *radii) {
   pair_data_ei_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_ei_type));
+  pair_data = (pair_data_ei_type*)malloc(sizeof(pair_data_ei_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
     (*pair_pot).pair_fn = pair_fn_ei;
@@ -689,7 +693,7 @@ double pair_data_ei_get_dielectric(pair_pot_type *pair_pot) {
 
 void pair_data_eidip_init(pair_pot_type *pair_pot, double *charges, double *dipoles, double alpha, double *radii, double *radii2) {
   pair_data_eidip_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_eidip_type));
+  pair_data = (pair_data_eidip_type*)malloc(sizeof(pair_data_eidip_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
     (*pair_pot).pair_fn = pair_fn_eidip;
@@ -811,7 +815,7 @@ double pair_data_eidip_get_alpha(pair_pot_type *pair_pot) {
 
 void pair_data_eislater1s1scorr_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double *slater1s_Z) {
   pair_data_eislater1s1scorr_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_eislater1s1scorr_type));
+  pair_data = (pair_data_eislater1s1scorr_type*)malloc(sizeof(pair_data_eislater1s1scorr_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
       (*pair_pot).pair_fn = pair_fn_eislater1s1scorr;
@@ -836,7 +840,7 @@ double pair_fn_eislater1s1scorr(void *pair_data, long center_index, long other_i
 
 void pair_data_eislater1sp1spcorr_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double *slater1s_Z, double *slater1p_widths, double *slater1p_N, double *slater1p_Z) {
   pair_data_eislater1sp1spcorr_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_eislater1sp1spcorr_type));
+  pair_data = (pair_data_eislater1sp1spcorr_type*)malloc(sizeof(pair_data_eislater1sp1spcorr_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
       (*pair_pot).pair_fn = pair_fn_eislater1sp1spcorr;
@@ -922,7 +926,7 @@ double pair_fn_eislater1sp1spcorr(void *pair_data, long center_index, long other
 
 void pair_data_olpslater1s1s_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double ex_scale, double corr_a, double corr_b, double corr_c ) {
   pair_data_olpslater1s1s_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_olpslater1s1s_type));
+  pair_data = (pair_data_olpslater1s1s_type*)malloc(sizeof(pair_data_olpslater1s1s_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
     (*pair_pot).pair_fn = pair_fn_olpslater1s1s;
@@ -991,7 +995,7 @@ double pair_data_olpslater1s1s_get_corr_c(pair_pot_type *pair_pot) {
 
 void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double ct_scale, double width_power) {
   pair_data_chargetransferslater1s1s_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_chargetransferslater1s1s_type));
+  pair_data = (pair_data_chargetransferslater1s1s_type*)malloc(sizeof(pair_data_chargetransferslater1s1s_type));
   (*pair_pot).pair_data = pair_data;
   if (pair_data != NULL) {
     (*pair_pot).pair_fn = pair_fn_chargetransferslater1s1s;
