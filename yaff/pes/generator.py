@@ -1220,16 +1220,17 @@ class FixedChargeGenerator(NonbondedGenerator):
 
 class MEDFFGenerator(NonbondedGenerator):
     prefix = 'MEDFF'
-    suffixes = ['UNIT', 'SCALE', 'ATOM', 'UPAR']
-    par_info = [('N', float), ('Z', float), ('SIGMA', float), ('ALPHA', float), ('EXPR42', float), ('RADIUS', float)]
+    suffixes = ['UNIT', 'SCALE', 'ATOM', 'BOND', 'UPAR']
+    par_info = [('N', float), ('Z', float), ('SIGMA', float), ('ALPHA', float), ('EXPR42', float), ('RADIUS', float), ('P', float)]
 
     def __call__(self, system, parsec, ff_args):
         self.check_suffixes(parsec)
         conversions = self.process_units(parsec['UNIT'])
         upars = self.process_upars(parsec['UPAR'])
         atom_table = self.process_atoms(parsec['ATOM'], conversions)
+        bond_table = self.process_bonds(parsec['BOND'], conversions)
         scale_table = self.process_scales(parsec['SCALE'])
-        self.apply(upars, atom_table, scale_table, system, ff_args)
+        self.apply(upars, atom_table, bond_table, scale_table, system, ff_args)
 
     def process_atoms(self, pardef, conversions):
         result = {}
@@ -1250,6 +1251,23 @@ class MEDFFGenerator(NonbondedGenerator):
             except ValueError:
                 pardef.complain(counter, 'contains a parameter that can not be converted to a floating point number.')
             result[ffatype] = N, Z, sigma, alpha, expr42, radius
+        return result
+
+    def process_bonds(self, pardef, conversions):
+        result = {}
+        for counter, line in pardef:
+            words = line.split()
+            if len(words) != 3:
+                pardef.complain(counter, 'should have 3 arguments.')
+            key = tuple(words[:2])
+            if key in result:
+                pardef.complain(counter, 'has a combination of atom types that were already encountered earlier.')
+            try:
+                charge_transfer = float(words[2])*conversions['P']
+            except ValueError:
+                pardef.complain(counter, 'contains a parameter that can not be converted to floating point numbers.')
+            result[key] = charge_transfer
+            result[key[::-1]] = -charge_transfer
         return result
 
     def process_upars(self, pardef):
@@ -1315,7 +1333,7 @@ class MEDFFGenerator(NonbondedGenerator):
                 alpha_table[Z] = float(words[2])
         return c6_table, alpha_table
 
-    def apply(self, upars, atom_table, scale_table, system, ff_args):
+    def apply(self, upars, atom_table, bond_table, scale_table, system, ff_args):
         if system.charges is None:
             system.charges = np.zeros(system.natom)
         elif log.do_warning and abs(system.charges).max() != 0:
@@ -1353,6 +1371,20 @@ class MEDFFGenerator(NonbondedGenerator):
             system.slater1s_Z[i] = Z
             system.slater1s_widths[i] = sigma
             system.radii[i] = radius
+        for i0, i1 in system.iter_bonds():
+            ffatype0 = system.get_ffatype(i0)
+            ffatype1 = system.get_ffatype(i1)
+            if ffatype0 == ffatype1:
+                continue
+            charge_transfer = bond_table.get((ffatype0, ffatype1))
+            if charge_transfer is None:
+                if log.do_warning:
+                    log.warn('No charge transfer parameter for atom pair (%i,%i) with fftype (%s,%s).' % (i0, i1, system.get_ffatype(i0), system.get_ffatype(i1)))
+            else:
+                system.slater1s_N[i0] += charge_transfer
+                system.slater1s_N[i1] -= charge_transfer
+                system.charges[i0] += charge_transfer
+                system.charges[i1] -= charge_transfer
 
         # prepare other parameters
         scalings = Scalings(system, scale_table[1], scale_table[2], scale_table[3])

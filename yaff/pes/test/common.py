@@ -44,7 +44,8 @@ def check_gpos_part(system, part, nlists=None):
             nlists.update()
         if do_gradient:
             gpos = np.zeros(system.pos.shape, float)
-            e = part.compute(gpos)
+            hess = np.zeros((3*system.natom,3*system.natom), float)
+            e = part.compute(gpos, hess=hess)
             assert np.isfinite(e)
             assert np.isfinite(gpos).all()
             return e, gpos.ravel()

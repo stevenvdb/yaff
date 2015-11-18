@@ -337,7 +337,7 @@ class DDNeighborList(NeighborList):
         NeighborList.update(self)
         self.nneigh_max = (3*self.nneigh)/2
 
-    def update(self, nthreads=4):
+    def update(self, nthreads=1):
         #TODO Figure out nthreads automatically
         #TODO Allow specification and detection of domains
         if len(self.neighs)==10: self.initialize()

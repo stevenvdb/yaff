@@ -726,6 +726,8 @@ class ForcePartValence(ForcePart):
             energy = self.vlist.forward()
             if not ((gpos is None) and (vtens is None)):
                 self.vlist.back()
+                self.iclist.back()
+                self.dlist.back(gpos, vtens)
                 if hess is not None:
                     #TODO: exploit symmetry a bit further
                     #TODO: The order of the hessian computation and back function matters
@@ -752,8 +754,6 @@ class ForcePartValence(ForcePart):
                             hess[3*k:3*(k+1),3*j:3*(j+1)] -= tmp[3*jdelta:3*(jdelta+1),3*idelta:3*(idelta+1)]
                             hess[3*j:3*(j+1),3*l:3*(l+1)] += tmp[3*idelta:3*(idelta+1),3*jdelta:3*(jdelta+1)]
                             hess[3*l:3*(l+1),3*j:3*(j+1)] += tmp[3*jdelta:3*(jdelta+1),3*idelta:3*(idelta+1)]
-                self.iclist.back()
-                self.dlist.back(gpos, vtens)
             return energy
 
 
