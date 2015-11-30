@@ -58,6 +58,7 @@ SplinePot::SplinePot(std::size_t n, long *ffatype_ids, long nffa, double *r, dou
 
 double SplinePot::eval(double x, long index ) {
     // 1) find the index of the interval in which t lies.
+    // TODO warn when x is outside of range
     double t = (x-first_x)/alpha;
     int j = (int)floor(t);
     if (j==npoints - 1) j = npoints - 2;
