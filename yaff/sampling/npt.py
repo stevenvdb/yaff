@@ -204,44 +204,27 @@ class McDonaldBarostat(VerletHook):
             iterative.acc = -iterative.gpos/iterative.masses.reshape(-1,1)
 
         natom = iterative.ff.system.natom
-        with timer.section('AMB'):
-            # A) Change the logarithm of the volume isotropically.
-            scale = np.exp(np.random.uniform(-self.amp, self.amp))
-            # A.0) Keep track of old state
-            vol0 = iterative.ff.system.cell.volume
-            epot0 = iterative.epot
-            rvecs0 = iterative.ff.system.cell.rvecs.copy()
-            pos0 = iterative.pos.copy()
-            # A.1) scale the system and recompute the energy
-            compute(pos0*scale, rvecs0*scale)
-            epot1 = iterative.epot
-            vol1 = iterative.ff.system.cell.volume
-            # A.2) compute the acceptance ratio
-            beta = 1/(boltzmann*self.temp)
-            arg = (epot1 - epot0 + self.press*(vol1 - vol0) - (natom+1)/beta*np.log(vol1/vol0))
-            accepted = arg < 0 or np.random.uniform(0, 1) < np.exp(-beta*arg)
-            if accepted:
-                # add a correction to the conserved quantity
-                self.econs_correction += epot0 - epot1
-            else:
-                # revert the cell and the positions in the original state
-                compute(pos0, rvecs0)
-            # B) Change the velocities
-            ekin0 = iterative._compute_ekin()
-            iterative.vel[:] = get_random_vel(self.temp, False, iterative.masses)
-            # C) Update the kinetic energy and the reference for the conserved quantity
-            ekin1 = iterative._compute_ekin()
-            self.econs_correction += ekin0 - ekin1
-            if log.do_medium:
-                with log.section('AMB'):
-                    s = {True: 'accepted', False: 'rejected'}[accepted]
-                    log('BARO   volscale %10.7f      arg %s      %s' % (scale, log.energy(arg), s))
-                    if accepted:
-                        log('BARO   energy change %s      (new vol)**(1/3) %s' % (
-                            log.energy(epot1 - epot0), log.length(vol1**(1.0/3.0))
-                        ))
-                    log('THERMO energy change %s' % log.energy(ekin0 - ekin1))
-
+        # Change the logarithm of the volume isotropically.
+        scale = np.exp(np.random.uniform(-self.amp, self.amp))
+        # Keep track of old state
+        vol0 = iterative.ff.system.cell.volume
+        epot0 = iterative.epot
+        rvecs0 = iterative.ff.system.cell.rvecs.copy()
+        pos0 = iterative.pos.copy()
+        # Scale the system and recompute the energy
+        compute(pos0*scale, rvecs0*scale)
+        epot1 = iterative.epot
+        vol1 = iterative.ff.system.cell.volume
+        # Compute the acceptance ratio
+        beta = 1/(boltzmann*self.temp)
+        arg = (epot1 - epot0 + self.press*(vol1 - vol0) - (natom+1)/beta*np.log(vol1/vol0))
+        accepted = arg < 0 or np.random.uniform(0, 1) < np.exp(-beta*arg)
+        if accepted:
+            # add a correction to the conserved quantity
+            self.econs_correction += epot0 - epot1
+        else:
+            # revert the cell and the positions in the original state
+            compute(pos0, rvecs0)
 
 
 class BerendsenBarostat(VerletHook):
@@ -535,7 +518,7 @@ class MTKBarostat(VerletHook):
             This hook implements the Martyna-Tobias-Klein barostat. The equations
             are derived in:
 
-                Martyna, G. J.; Tobias, D. J.: Klein, M. L. J. Chem. Phys. 1994,
+                Martyna, G. J.; Tobias, D. J.; Klein, M. L. J. Chem. Phys. 1994,
                 101, 4177-4189.
 
             The implementation (used here) of a symplectic integrator of this
@@ -558,7 +541,7 @@ class MTKBarostat(VerletHook):
             **Optional arguments:**
 
             start
-                The step at which the thermostat becomes active.
+                The step at which the barostat becomes active.
 
             timecon
                 The time constant of the Martyna-Tobias-Klein barostat.

@@ -296,15 +296,7 @@ class ForceField(ForcePart):
         if self.needs_nlist_update:
             self.nlist.update()
             self.needs_nlist_update = False
-        self.gpos_parts[:] = 0.0
-        self.vtens_parts[:] = 0.0
-        result = 0.0
-        for i, part in enumerate(self.parts):
-            result += part.compute(self.gpos_parts[i,:,:], self.vtens_parts[i,:,:])
-        if gpos is not None:
-            gpos[:] = np.sum(self.gpos_parts, axis=0)
-        if vtens is not None:
-            vtens[:] = np.sum(self.vtens_parts, axis=0)
+        result = sum([part.compute(gpos, vtens, hess) for part in self.parts])
         return result
 
 
@@ -460,7 +452,7 @@ class ForcePartEwaldReciprocalDD(ForcePart):
         self.system = system
         self.alpha = alpha
         self.gcut = gcut
-        self.dielectric = dielectric
+        #self.dielectric = dielectric
         self.update_gmax()
         self.work = np.empty(system.natom*2)
         if log.do_medium:
@@ -488,64 +480,6 @@ class ForcePartEwaldReciprocalDD(ForcePart):
         with timer.section('Ewald reci.'):
             if hess is not None:
                 raise NotImplementedError('Hessian computation not implemented for ForcePartEwaldReciprocalDD')
-            return compute_ewald_reci_dd(
-                self.system.pos, self.system.charges, self.system.dipoles, self.system.cell, self.alpha,
-                self.gmax, self.gcut, gpos, self.work, vtens
-            )
-
-
-class ForcePartEwaldReciprocalDD(ForcePart):
-    '''The long-range contribution to the dipole-dipole
-       electrostatic interaction in 3D periodic systems.
-    '''
-    def __init__(self, system, alpha, gcut=0.35):
-        '''
-           **Arguments:**
-
-           system
-                The system to which this interaction applies.
-
-           alpha
-                The alpha parameter in the Ewald summation method.
-
-           gcut
-                The cutoff in reciprocal space.
-        '''
-        ForcePart.__init__(self, 'ewald_reci', system)
-        if not system.cell.nvec == 3:
-            raise TypeError('The system must have a 3D periodic cell.')
-        if system.charges is None:
-            raise ValueError('The system does not have charges.')
-        if system.dipoles is None:
-            raise ValueError('The system does not have dipoles.')
-        self.system = system
-        self.alpha = alpha
-        self.gcut = gcut
-        self.update_gmax()
-        self.work = np.empty(system.natom*2)
-        if log.do_medium:
-            with log.section('FPINIT'):
-                log('Force part: %s' % self.name)
-                log.hline()
-                log('  alpha:             %s' % log.invlength(self.alpha))
-                log('  gcut:              %s' % log.invlength(self.gcut))
-                log.hline()
-
-
-    def update_gmax(self):
-        '''This routine must be called after the attribute self.gmax is modified.'''
-        self.gmax = np.ceil(self.gcut/self.system.cell.gspacings-0.5).astype(int)
-        if log.do_debug:
-            with log.section('EWALD'):
-                log('gmax a,b,c   = %i,%i,%i' % tuple(self.gmax))
-
-    def update_rvecs(self, rvecs):
-        '''See :meth:`yaff.pes.ff.ForcePart.update_rvecs`'''
-        ForcePart.update_rvecs(self, rvecs)
-        self.update_gmax()
-
-    def _internal_compute(self, gpos, vtens):
-        with timer.section('Ewald reci.'):
             return compute_ewald_reci_dd(
                 self.system.pos, self.system.charges, self.system.dipoles, self.system.cell, self.alpha,
                 self.gmax, self.gcut, gpos, self.work, vtens

@@ -76,7 +76,7 @@ class FFArgs(object):
     '''
     def __init__(self, rcut=18.89726133921252, tr=Switch3(7.558904535685008),
                  alpha_scale=3.5, gcut_scale=1.1, skin=0, smooth_ei=False,
-                 reci_ei='ewald', sw=None, dd=False):
+                 reci_ei='ewald', sw=None, domains=None, nguest=-1):
         """
            **Optional arguments:**
 
@@ -125,7 +125,7 @@ class FFArgs(object):
            that the numerical errors do not depend too much on the real space
            cutoff and the system size.
 
-            dd
+            domains
                 Use domain decomposition to construct neighbor lists
         """
         if reci_ei not in ['ignore', 'ewald']:
@@ -138,17 +138,18 @@ class FFArgs(object):
         self.smooth_ei = smooth_ei
         self.reci_ei = reci_ei
         self.sw = sw
-        self.dd = dd
+        self.domains = domains
+        self.nguest = nguest
         # arguments for the ForceField constructor
         self.parts = []
         self.nlist = None
 
     def get_nlist(self, system):
         if self.nlist is None:
-            if self.dd:
-                self.nlist = DDNeighborList(system, self.skin)
+            if self.domains is not None:
+                self.nlist = DDNeighborList(system, self.skin, domains=self.domains, nguest=self.nguest)
             else:
-                self.nlist = NeighborList(system, self.skin)
+                self.nlist = NeighborList(system, self.skin, nguest=self.nguest)
         return self.nlist
 
     def get_part(self, ForcePartClass):

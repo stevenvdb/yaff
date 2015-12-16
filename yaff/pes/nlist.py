@@ -39,7 +39,7 @@
 '''
 
 
-import numpy as np
+import numpy as np, os
 
 from yaff.log import log, timer
 from yaff.pes.ext import nlist_status_init, nlist_status_finish, nlist_build, \
@@ -59,7 +59,7 @@ neigh_dtype = [
 class NeighborList(object):
     '''Algorithms to keep track of all pair distances below a given rcut
     '''
-    def __init__(self, system, skin=0):
+    def __init__(self, system, skin=0, domains=None, nguest=-1):
         """
            **Arguments:**
 
@@ -81,6 +81,10 @@ class NeighborList(object):
                 reasonable. If the skin is set too large, the updates will
                 become very inefficient. Some tuning of ``rcut`` and ``skin``
                 may be beneficial.
+
+            nguest
+                Number of guest atoms inside a framework. Only pairs of atoms
+                with at least one guest molecule are included in the nlist.
         """
         if skin < 0:
             raise ValueError('The skin parameter must be positive.')
@@ -94,6 +98,10 @@ class NeighborList(object):
         # for skin algorithm:
         self._pos_old = None
         self.rebuild_next = False
+        # for possible domain decomposition
+        self.domains = domains
+        # for separating host-guest interactions
+        self.nguest = nguest
 
     def request_rcut(self, rcut):
         """Make sure the internal rcut parameter is at least is high as rcut."""
@@ -151,7 +159,7 @@ class NeighborList(object):
                 while True:
                     done = nlist_build(
                         self.system.pos, self.rcut + self.skin, self.rmax,
-                        self.system.cell, status, self.neighs[last_start:]
+                        self.system.cell, status, self.neighs[last_start:], split=self.nguest
                     )
                     if done:
                         break
@@ -337,8 +345,10 @@ class DDNeighborList(NeighborList):
         NeighborList.update(self)
         self.nneigh_max = (3*self.nneigh)/2
 
-    def update(self, nthreads=4):
+    def update(self):
         #TODO Figure out nthreads automatically
+        try: nthreads = int(os.environ["OMP_NUM_THREADS"])
+        except: nthreads = 1
         #TODO Allow specification and detection of domains
         if len(self.neighs)==10: self.initialize()
         with log.section('DDNLIST'), timer.section('DDNlist'):
@@ -347,9 +357,8 @@ class DDNeighborList(NeighborList):
                 # Initialize domain decomposition
                 bin_indexes = np.zeros(self.system.natom, dtype=long)
                 order = np.zeros(self.system.natom, dtype=long)
-                domains = np.array([2,2,2], dtype=long)
-                r_circum = nlist_decompose(self.system.pos, self.system.cell, bin_indexes, order, domains)
-                nbins = np.prod(domains)
+                r_circum = nlist_decompose(self.system.pos, self.system.cell, bin_indexes, order, self.domains)
+                nbins = np.prod(self.domains)
                 binsizes = np.zeros(nbins,dtype=long)
                 binsizes_cum = np.zeros(nbins,dtype=long)
                 for i in xrange(nbins):
@@ -363,7 +372,7 @@ class DDNeighborList(NeighborList):
                 while True:
                     done = nlist_build_dd_omp(newpos, self.rcut+self.skin, self.rmax,
                         self.system.cell, status, self.neighs[:], binsizes,
-                        binsizes_cum, nbins, domains, r_circum )
+                        binsizes_cum, nbins, self.domains, r_circum )
                     self.nneigh = nlist_status_finish(status)
                     # Check if we succeeded succesfully
                     if done:

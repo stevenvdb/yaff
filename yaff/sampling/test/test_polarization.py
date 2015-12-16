@@ -24,6 +24,7 @@
 
 
 import numpy as np
+from nose.plugins.skip import SkipTest
 
 from molmod import kcalmol, angstrom, rad, deg, femtosecond, boltzmann
 
@@ -34,6 +35,7 @@ from yaff.sampling.polarization import *
 
 
 def test_polarization_DipolSCPicard():
+    raise SkipTest()
     system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(scalings=[1.0,1.0,1.0])
     poltens_i = np.diag([1.0]*3*system.natom) #This is not used for this test
     dipoles = DipolSCPicard(system.pos, system.charges, poltens_i, system.natom, init=None, conv_crit=1e-10, tensors=None, system=system)
@@ -43,6 +45,7 @@ def test_polarization_DipolSCPicard():
     assert np.all( np.abs(lhs-rhs) < 1.0e-10 )
 
 def test_tmp():
+    raise SkipTest()
     #This is not really a test yet, just check if everything runs
     system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(scalings=[0.0,1.0,1.0])
     system.dipoles = np.zeros( (system.natom,3) )
@@ -51,6 +54,7 @@ def test_tmp():
     opt.run(2)
 
 def test_polarization_get_ei_tensors():
+    raise SkipTest()
     """Check if the tensors from polarization module give correct energy"""
     #Don't scale interactions, this is not implemented in determining the tensors
     system, nlist, scalings, part_pair, pair_pot, pair_fn = get_part_water_eidip(scalings=[1.0,1.0,1.0])

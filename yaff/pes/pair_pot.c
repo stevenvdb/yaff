@@ -484,6 +484,38 @@ double pair_fn_ljcross(void *pair_data, long center_index, long other_index, dou
 
 
 
+void pair_data_lj96cross_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *eps_cross, double *sig_cross) {
+  pair_data_lj96cross_type *pair_data;
+  pair_data = (pair_data_lj96cross_type*)malloc(sizeof(pair_data_lj96cross_type));
+  (*pair_pot).pair_data = pair_data;
+  if (pair_data != NULL) {
+    (*pair_pot).pair_fn = pair_fn_lj96cross;
+    (*pair_data).nffatype = nffatype;
+    (*pair_data).ffatype_ids = ffatype_ids;
+    (*pair_data).eps_cross = eps_cross;
+    (*pair_data).sig_cross = sig_cross;
+  }
+}
+
+
+double pair_fn_lj96cross(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *gg, double *g_cart) {
+  long i;
+  double sigma, epsilon, x;
+  // Load parameters from data structure and mix
+  pair_data_lj96cross_type *pd;
+  pd = (pair_data_lj96cross_type*)pair_data;
+  i = (*pd).ffatype_ids[center_index]*(*pd).nffatype + (*pd).ffatype_ids[other_index];
+  epsilon = (*pd).eps_cross[i];
+  sigma = (*pd).sig_cross[i];
+  x = sigma/d;
+  x *= x*x;
+  if (g != NULL) {
+    *g = 18.0*epsilon/d/d*x*x*(1.0-x);
+  }
+  return epsilon*x*x*(2.0*x-3.0);
+}
+
+
 void pair_data_dampdisp_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *c6_cross, double *b_cross) {
   pair_data_dampdisp_type *pair_data;
   pair_data = (pair_data_dampdisp_type*)malloc(sizeof(pair_data_dampdisp_type));
@@ -663,6 +695,7 @@ double pair_fn_ei(void *pair_data, long center_index, long other_index, double d
       pot = qprod*erfc(x)/d;
       if (g != NULL) *g = (-M_TWO_DIV_SQRT_PI*alpha*exp(-x*x)*qprod - pot)/(d*d);
       if (gg != NULL) *gg = (pot+M_TWO_DIV_SQRT_PI*alpha*(1.0+x*x)*exp(-x*x)*qprod)*2.0/(d*d*d*d);
+    }
   }
   //Original only
   else {
@@ -865,92 +898,6 @@ double pair_fn_eislater1sp1spcorr(void *pair_data, long center_index, long other
   Nb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Ns[other_index];
   Zb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zs[other_index];
   pot += slaterei_0_0(a,b,Na,Za,Nb,Zb,d,g, gg);
-
-  // Monopole-Dipole interactions
-  for (i=0;i<3;i++) {
-    a  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthss[center_index];
-    Na = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Ns[center_index];
-    Za = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zs[center_index];
-    b  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthsp[3*other_index + i];
-    Nb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Np[3*other_index + i];
-    Zb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zp[3*other_index + i];
-    if ( g != NULL ) {
-      sg = 0.0;
-      pot_tmp = slaterei_1_0(b,a,Nb,Zb,Na,Za,d,&sg);
-      *g += -delta[i]*sg;
-      g_cart[i] += -pot_tmp;
-    } else pot_tmp = slaterei_1_0(b,a,Nb,Zb,Na,Za,d,NULL);
-    pot += -delta[i]*pot_tmp;
-  }
-  // Dipole-Monopole interactions
-  for (i=0;i<3;i++) {
-    a  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthsp[3*center_index+i];
-    Na = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Np[3*center_index+i];
-    Za = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zp[3*center_index+i];
-    b  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthss[other_index];
-    Nb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Ns[other_index];
-    Zb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zs[other_index];
-    if ( g != NULL ) {
-      sg = 0.0;
-      pot_tmp = slaterei_1_0(a,b,Na,Za,Nb,Zb,d,&sg);
-      *g += delta[i]*sg;
-      g_cart[i] += pot_tmp;
-    } else pot_tmp = slaterei_1_0(a,b,Na,Za,Nb,Zb,d,NULL);
-    pot += delta[i]*pot_tmp;
-  }
-  // Dipole-Dipole interactions
-  for (i=0;i<3;i++) {
-    for (j=0;j<3;j++) {
-      a  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthsp[3*center_index + i];
-      Na = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Np[3*center_index + i];
-      Za = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zp[3*center_index + i];
-      b  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthsp[3*other_index + j];
-      Nb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Np[3*other_index + j];
-      Zb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zp[3*other_index + j];
-
-      if ( g != NULL ) {
-        sg = 0.0;
-        pot_tmp = slaterei_1_1(a,b,Na,Za,Nb,Zb,d,&sg);
-        *g += -delta[i]*delta[j]*sg;
-        g_cart[i] += -delta[j]*pot_tmp;
-        g_cart[j] += -delta[i]*pot_tmp;
-      } else pot_tmp = slaterei_1_1(a,b,Na,Za,Nb,Zb,d,NULL);
-      pot += -delta[i]*delta[j]*pot_tmp;
-      if (i==j) pot += slaterei_1_1_kronecker(a,b,Na,Za,Nb,Zb,d,g);
-    }
-  }
-  return pot;
-}
-
-
-void pair_data_eislater1sp1spcorr_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double *slater1s_Z, double *slater1p_widths, double *slater1p_N, double *slater1p_Z) {
-  pair_data_eislater1sp1spcorr_type *pair_data;
-  pair_data = malloc(sizeof(pair_data_eislater1sp1spcorr_type));
-  (*pair_pot).pair_data = pair_data;
-  if (pair_data != NULL) {
-      (*pair_pot).pair_fn = pair_fn_eislater1sp1spcorr;
-      (*pair_data).widthss = slater1s_widths;
-      (*pair_data).Ns = slater1s_N;
-      (*pair_data).Zs = slater1s_Z;
-      (*pair_data).widthsp = slater1p_widths;
-      (*pair_data).Np = slater1p_N;
-      (*pair_data).Zp = slater1p_Z;
-  }
-}
-
-double pair_fn_eislater1sp1spcorr(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *g_cart) {
-  long i,j;
-  double a,Na,Za,b,Nb,Zb;
-  double pot = 0.0;
-  double pot_tmp, sg;
-  // Monopole-Monopole interaction
-  a  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthss[center_index];
-  Na = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Ns[center_index];
-  Za = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zs[center_index];
-  b  = (*(pair_data_eislater1sp1spcorr_type*)pair_data).widthss[other_index];
-  Nb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Ns[other_index];
-  Zb = (*(pair_data_eislater1sp1spcorr_type*)pair_data).Zs[other_index];
-  pot += slaterei_0_0(a,b,Na,Za,Nb,Zb,d,g);
 
   // Monopole-Dipole interactions
   for (i=0;i<3;i++) {
