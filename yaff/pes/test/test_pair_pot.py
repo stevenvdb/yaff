@@ -1026,7 +1026,7 @@ def test_pair_pot_lj96cross_caffeine_9A():
     check_pair_pot_caffeine(system, nlist, scalings, part_pair, pair_fn, 1e-15)
 
 
-def get_part_caffeine_dampdisp_9A():
+def get_part_caffeine_dampdisp_9A(power=6):
     # Get a system and define scalings
     system = get_system_caffeine()
     nlist = NeighborList(system)
@@ -1041,7 +1041,7 @@ def get_part_caffeine_dampdisp_9A():
     b_cross = np.zeros((4, 4), float)
     # Construct the pair potential and part
     pair_pot = PairPotDampDisp(system.ffatype_ids, c6_cross, b_cross, 9*angstrom,
-        tr=None, c6s=c6s, bs=bs, vols=vols)
+        tr=None, c6s=c6s, bs=bs, vols=vols, power=power)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     # The pair function
     def pair_fn(i0, i1, d):
@@ -1057,20 +1057,28 @@ def get_part_caffeine_dampdisp_9A():
             b = 0.5*(b0+b1)
             damp = 0
             fac = 1
-            for k in xrange(7):
+            for k in xrange(power+1):
                 damp += (b*d)**k/fac
                 fac *= k+1
             damp = 1 - np.exp(-b*d)*damp
-            return -c6/d**6*damp
+            return -c6/d**power*damp
         else:
             damp = 1
-            return -c6/d**6
+            return -c6/d**power
     return system, nlist, scalings, part_pair, pair_fn
 
 
 def test_pair_pot_dampdisp_caffeine_9A():
-    system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_dampdisp_9A()
+    system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_dampdisp_9A(power=6)
     check_pair_pot_caffeine(system, nlist, scalings, part_pair, pair_fn, 1e-15)
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
+    system, nlist, scalings, part_pair, pair_fn = get_part_caffeine_dampdisp_9A(power=8)
+    check_pair_pot_caffeine(system, nlist, scalings, part_pair, pair_fn, 1e-15)
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
 
 
 def get_part_caffeine_ei1_10A():

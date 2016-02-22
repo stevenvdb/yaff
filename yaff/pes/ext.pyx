@@ -1483,6 +1483,7 @@ cdef class PairPotDampDisp(PairPot):
     cdef long _c_nffatype
     cdef np.ndarray _c_c6_cross
     cdef np.ndarray _c_b_cross
+    cdef long power
     name = 'dampdisp'
 
     def __cinit__(self, np.ndarray[long, ndim=1] ffatype_ids not None,
@@ -1491,7 +1492,8 @@ cdef class PairPotDampDisp(PairPot):
                   double rcut, Truncation tr=None, SwitchOn sw=None,
                   np.ndarray[double, ndim=1] c6s=None,
                   np.ndarray[double, ndim=1] bs=None,
-                  np.ndarray[double, ndim=1] vols=None):
+                  np.ndarray[double, ndim=1] vols=None,
+                  int power=6):
         assert ffatype_ids.flags['C_CONTIGUOUS']
         assert c6_cross.flags['C_CONTIGUOUS']
         assert b_cross.flags['C_CONTIGUOUS']
@@ -1517,13 +1519,14 @@ cdef class PairPotDampDisp(PairPot):
         self.set_switchon(sw)
         pair_pot.pair_data_dampdisp_init(
             self._c_pair_pot, nffatype, <long*> ffatype_ids.data,
-            <double*> c6_cross.data, <double*> b_cross.data,
+            <double*> c6_cross.data, <double*> b_cross.data, power
         )
         if not pair_pot.pair_pot_ready(self._c_pair_pot):
             raise MemoryError()
         self._c_nffatype = nffatype
         self._c_c6_cross = c6_cross
         self._c_b_cross = b_cross
+        self.power = power
 
     def _init_c6_cross(self, nffatype, c6_cross, c6s, vols):
         for i0 in xrange(nffatype):
@@ -1544,7 +1547,7 @@ cdef class PairPotDampDisp(PairPot):
         '''Print suitable initialization info on screen.'''
         if log.do_high:
             log.hline()
-            log('ffatype_id0 ffatype_id1         C6          B')
+            log('ffatype_id0 ffatype_id1         C%d          B'%self.power)
             log.hline()
             for i0 in xrange(self._c_nffatype):
                 for i1 in xrange(i0+1):

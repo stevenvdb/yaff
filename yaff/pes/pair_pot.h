@@ -129,9 +129,10 @@ typedef struct {
   long *ffatype_ids;
   double *c6_cross;
   double *b_cross;
+  long power;
 } pair_data_dampdisp_type;
 
-void pair_data_dampdisp_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *c6_cross, double *b_cross);
+void pair_data_dampdisp_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *c6_cross, double *b_cross, long power);
 double pair_fn_dampdisp(void *pair_data, long center_index, long other_index, double d, double *dr, double *g,  double *gg, double *g_cart);
 
 typedef struct {

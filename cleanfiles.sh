@@ -4,7 +4,7 @@ for i in $(find yaff data/examples | egrep "\.pyc$|\.py~$|\.pyc~$|\.bak$|\.so$")
 for d in data/examples/*; do (cd $d; echo Claning in $d; ./clean.sh); done
 
 rm -vr doctrees
-rm -v yaff/pes/ext.c
+rm -v yaff/pes/ext.cpp
 (cd doc; make clean)
 rm -v MANIFEST
 rm -vr dist

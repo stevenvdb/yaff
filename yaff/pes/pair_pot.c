@@ -516,7 +516,7 @@ double pair_fn_lj96cross(void *pair_data, long center_index, long other_index, d
 }
 
 
-void pair_data_dampdisp_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *c6_cross, double *b_cross) {
+void pair_data_dampdisp_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *c6_cross, double *b_cross, long power) {
   pair_data_dampdisp_type *pair_data;
   pair_data = (pair_data_dampdisp_type*)malloc(sizeof(pair_data_dampdisp_type));
   (*pair_pot).pair_data = pair_data;
@@ -526,6 +526,7 @@ void pair_data_dampdisp_init(pair_pot_type *pair_pot, long nffatype, long* ffaty
     (*pair_data).ffatype_ids = ffatype_ids;
     (*pair_data).c6_cross = c6_cross;
     (*pair_data).b_cross = b_cross;
+    (*pair_data).power = power;
   }
 }
 
@@ -553,39 +554,43 @@ double tang_toennies(double x, int order, double *g, double *gg){
 }
 
 double pair_fn_dampdisp(void *pair_data, long center_index, long other_index, double d, double *dr, double *g,  double *gg, double *g_cart) {
-  long i;
+  long i,j,power;
   double b, disp, damp, c6;
   // Load parameters from data structure and mix
   pair_data_dampdisp_type *pd;
   pd = (pair_data_dampdisp_type*)pair_data;
   i = (*pd).ffatype_ids[center_index]*(*pd).nffatype + (*pd).ffatype_ids[other_index];
+  power = (*pd).power;
   c6 = (*pd).c6_cross[i];
   if (c6==0.0) return 0.0;
   b = (*pd).b_cross[i];
   if (b==0.0) {
     // without damping
-    disp = d*d;
-    disp *= disp*disp;
+    disp = 1.0;
+    for (j=0;j<power;j++) { disp *= d; }
+    //disp *= disp*disp;
     disp = -c6/disp;
     if (g != NULL) {
-      *g = -6.0*disp/(d*d);
+      *g = -power*disp/(d*d);
     }
     if (gg != NULL) {
-      *gg = 42.0*disp/(d*d*d*d);
+      *gg = power*(power+1.0)*disp/(d*d*d*d);
     }
     return disp;
   } else {
     // with damping
-    damp = tang_toennies(b*d, 6, g, gg);
+    damp = tang_toennies(b*d, power, g, gg);
     // compute the energy
-    disp = d*d;
-    disp *= disp*disp;
+    disp = 1.0;
+    for (j=0;j<power;j++) { disp *= d; }
+    //disp = d*d;
+    //disp *= disp*disp;
     disp = -c6/disp;
     if (gg != NULL) {
-      *gg = ((*gg)*b*b-12.0/d*(*g)*b+42.0/d/d*damp)*disp/(d*d);
+      *gg = ((*gg)*b*b-2.0*power/d*(*g)*b+power*(power+1.0)/d/d*damp)*disp/(d*d);
     }
     if (g != NULL) {
-      *g = ((*g)*b-6.0/d*damp)*disp/d;
+      *g = ((*g)*b-power/d*damp)*disp/d;
     }
     return damp*disp;
   }

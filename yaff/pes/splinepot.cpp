@@ -62,6 +62,7 @@ double SplinePot::eval(double x, long index ) {
     double t = (x-first_x)/alpha;
     int j = (int)floor(t);
     if (j==npoints - 1) j = npoints - 2;
+    if (j<0) j=0;
     // 2) do the interpolation
     double u = t - j;
     j += npoints*index;

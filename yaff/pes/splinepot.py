@@ -151,6 +151,7 @@ class ForcePartSpline(ForcePart):
             if store is not None:
                 np.savetxt('%s_phi%s.dat'%(store,suffix),phi)
                 np.savetxt('%s_dphi%s.dat'%(store,suffix),dphi)
+                np.savetxt('%s_x%s.dat'%(store,suffix),x)
         self.spline_pot = PairPotSpline(nsplines, self.system.ffatype_ids, nffa, x, phi, dphi, self.scalings.stab)
         self.nlist.update()
 
