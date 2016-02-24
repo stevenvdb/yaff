@@ -66,7 +66,7 @@ double slaterei_0_0(double a, double b, double Na, double Za, double Nb, double 
   if (g != NULL) g2 = -(1.0/b+1.0/d)*pot2 - 0.5*expb/d/b;
   if (gg != NULL) gg2 = -(2.0+2.0*db+db*db+0.5*db*db*db)*expb/d/d/d;
   // Discriminate between small and large difference in Slater width
-  if (fabs(a-b) > 0.025) {
+  if (fabs(a-b) > 0.001) {
     // Precompute some more factors
     double diff = 1.0/(a2-b2);
     double diff2 = diff*diff;
@@ -382,7 +382,7 @@ double slaterolp_0_0(double a, double b, double d, double *g, double *gg){
   da = d/a;
   db = d/b;
   // Discriminate between small and not small difference in slater width
-  if (fabs(delta) > 0.025) {
+  if (fabs(delta) > 0.001) {
     double a2 = a*a;
     double b2 = b*b;
     double diff = 1.0/(a2-b2);
