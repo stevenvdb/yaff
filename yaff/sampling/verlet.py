@@ -154,8 +154,9 @@ class VerletIntegrator(Iterative):
             tgrp = self.restart_h5['trajectory']
             self.pos = tgrp['pos'][-1,:,:]
             ff.update_pos(self.pos)
-            self.rvecs = tgrp['cell'][-1,:,:]
-            ff.update_rvecs(self.rvecs)
+            if 'cell' in tgrp:
+                self.rvecs = tgrp['cell'][-1,:,:]
+                ff.update_rvecs(self.rvecs)
             # Arguments which can be provided in the VerletIntegrator object are only
             # taken from the restart file if not provided explicitly
             if time0 is None:
@@ -299,7 +300,8 @@ class VerletIntegrator(Iterative):
                     beta = rgrp['beta'][()]
                     baro = BerendsenBarostat(ff, temp, press, timecon=timecon, beta=beta, anisotropic=anisotropic, vol_constraint=vol_constraint)
                 elif baro_name == 'MTTK':
-                    vel0 = tgrp['baro_vel_press'][-1,:,:]
+                    if anisotropic: vel0 = tgrp['baro_vel_press'][-1,:,:]
+                    else: vel0 = tgrp['baro_vel_press'][-1]
                     baro = MTKBarostat(ff, temp, press, timecon=timecon, anisotropic=anisotropic, vol_constraint=vol_constraint, baro_thermo=baro_thermo, vel_press0=vel0, restart=True)
 
         # append the necessary hooks
@@ -492,11 +494,12 @@ class ConsErrTracker(object):
             self.econs_sumsq = 0.0
         else:
             tgrp = restart_h5['trajectory']
-            self.counter = tgrp['counter'][-1]+1    # self.counter = Iterative.counter + 1
+            self.counter = tgrp['counter'][-1] + 1    # self.counter = Iterative.counter + 1
             self.ekin_sum = tgrp['ekin_sum'][-1]
             self.ekin_sumsq = tgrp['ekin_sumsq'][-1]
             self.econs_sum = tgrp['econs_sum'][-1]
             self.econs_sumsq = tgrp['econs_sumsq'][-1]
+        self.eps = np.finfo(float).eps
 
     def update(self, ekin, econs):
         self.counter += 1
@@ -508,9 +511,14 @@ class ConsErrTracker(object):
     def get(self):
         if self.counter > 0:
             ekin_var = self.ekin_sumsq/self.counter - (self.ekin_sum/self.counter)**2
-            if ekin_var > 0:
+            max_contrib = max(self.ekin_sumsq/self.counter, (self.ekin_sum/self.counter)**2)
+            if np.abs(ekin_var)/max_contrib > 10.*self.eps:
+            # only calculate further if the variance is substantially different from zero,
+            # to mediate precision errors
                 econs_var = self.econs_sumsq/self.counter - (self.econs_sum/self.counter)**2
-                return np.sqrt(econs_var/ekin_var)
+                max_contrib = max(self.econs_sumsq/self.counter, (self.econs_sum/self.counter)**2)
+                if np.abs(econs_var)/max_contrib > 10.*self.eps:
+                    return np.sqrt(econs_var/ekin_var)
         return 0.0
 
 

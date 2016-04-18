@@ -108,14 +108,14 @@ class ForcePartSpline(ForcePart):
         if load is not None:
             phi = np.loadtxt('%s_phi%s.dat'%(load,suffix))
             dphi = np.loadtxt('%s_dphi%s.dat'%(load,suffix))
+            x = np.loadtxt('%s_x%s.dat'%(load,suffix))
             nsplines = phi.shape[0]
-            x = np.linspace(rmin, rmax, num=1000, endpoint=True)
             nffa = np.amax(ncff.system.ffatype_ids)+1
         else:
             import matplotlib.pyplot as plt
             with timer.section('MAKE %s' % self.name):
                 # Construct x-y pairs
-                x = np.linspace(rmin, rmax, num=1000, endpoint=True)
+                x = np.linspace(rmin, rmax, num=npoints, endpoint=True)
                 y = np.zeros(x.shape)
                 dy = np.zeros(x.shape)
                 ncff.nlist.nneigh = 1

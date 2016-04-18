@@ -33,7 +33,7 @@ __all__ = ['HDF5Writer', 'XYZWriter', 'RestartWriter']
 
 
 class HDF5Writer(Hook):
-    def __init__(self, f, start=0, step=1, flush=None):
+    def __init__(self, f, start=0, step=1, flush=None, skip=[]):
         """
            **Argument:**
 
@@ -56,6 +56,7 @@ class HDF5Writer(Hook):
         """
         self.f = f
         self.flush = flush
+        self.skip = skip
         Hook.__init__(self, start, step)
 
     def __call__(self, iterative):
@@ -66,8 +67,9 @@ class HDF5Writer(Hook):
         tgrp = self.f['trajectory']
         # determine the row to write the current iteration to. If a previous
         # iterations was not completely written, then the last row is reused.
-        row = min(tgrp[key].shape[0] for key in iterative.state if key in tgrp.keys())
+        row = min(tgrp[key].shape[0] for key in iterative.state if key in tgrp.keys() and not key in self.skip)
         for key, item in iterative.state.iteritems():
+            if key in self.skip: continue
             if item.value is None:
                 continue
             if len(item.shape) > 0 and min(item.shape) == 0:
@@ -182,6 +184,7 @@ class RestartWriter(Hook):
             AttributeStateItem('vel'),
             CellStateItem(),
             AttributeStateItem('econs'),
+            ConsErrStateItem('econs_counter'),
             ConsErrStateItem('ekin_sum'),
             ConsErrStateItem('ekin_sumsq'),
             ConsErrStateItem('econs_sum'),

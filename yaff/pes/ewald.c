@@ -27,6 +27,7 @@
 #include "constants.h"
 #include "ewald.h"
 #include "cell.h"
+#include <omp.h>
 #include <stdio.h>
 
 double compute_ewald_reci(double *pos, long natom, double *charges,
