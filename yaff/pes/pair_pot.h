@@ -232,4 +232,17 @@ void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *sl
 double pair_fn_chargetransferslater1s1s(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *gg, double *g_cart);
 double pair_data_chargetransferslater1s1s_get_ct_scale(pair_pot_type *pair_pot);
 double pair_data_chargetransferslater1s1s_get_width_power(pair_pot_type *pair_pot);
+
+
+typedef struct {
+  double *N;
+  double *widths;
+  double *qh;
+  double *nai;
+  double hb_scale;
+} pair_data_hbond_type;
+
+void pair_data_hbond_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double *qh, double *nai, double ct_scale);
+double pair_fn_hbond(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *gg, double *g_cart);
+double pair_data_hbond_get_hb_scale(pair_pot_type *pair_pot);
 #endif

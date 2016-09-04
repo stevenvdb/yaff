@@ -92,3 +92,6 @@ cdef extern from "pair_pot.h":
     void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double ct_scale, double width_power)
     double pair_data_chargetransferslater1s1s_get_ct_scale(pair_pot_type *pair_pot)
     double pair_data_chargetransferslater1s1s_get_width_power(pair_pot_type *pair_pot)
+
+    void pair_data_hbond_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double *qh, double *nai, double ct_scale)
+    double pair_data_hbond_get_hb_scale(pair_pot_type *pair_pot)

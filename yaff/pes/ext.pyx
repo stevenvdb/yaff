@@ -53,7 +53,8 @@ __all__ = [
     'PairPotLJ96Cross',
     'PairPotDampDisp', 'PairPotDisp68BJDamp', 'PairPotEI', 'PairPotEIDip',
     'PairPotEiSlater1s1sCorr', 'PairPotEiSlater1sp1spCorr', 'PairPotOlpSlater1s1s',
-    'PairPotChargeTransferSlater1s1s', 'compute_ewald_reci', 'compute_ewald_reci_dd',
+    'PairPotChargeTransferSlater1s1s', 'PairPotHBond',
+    'compute_ewald_reci', 'compute_ewald_reci_dd',
     'compute_ewald_corr', 'compute_ewald_corr_dd', 'dlist_forward',
     'dlist_back', 'iclist_forward', 'iclist_back', 'iclist_jacobian', 'iclist_hessian',
     'vlist_forward', 'vlist_back', 'vlist_hessian', 'compute_grid3d',
@@ -2228,9 +2229,10 @@ cdef class PairPotOlpSlater1s1s(PairPot):
 
 cdef class PairPotChargeTransferSlater1s1s(PairPot):
     r'''Model for charge transfer energy proportional to the overlap of two 1s
-        Slater densities and a certain power of the product of Slater widths:
+        Slater densities and a certain power of the product of Slater widths,
+        modified by the relative populations:
 
-            E = ct_scale * slater_overlap / (sigma1*sigma2)**width_power
+            E = ct_scale * slater_overlap / (sigma1*sigma2)**width_power * [ (N1/N2)**2 + (N2/N1)**2]
 
         **Arguments:**
 
@@ -2263,13 +2265,14 @@ cdef class PairPotChargeTransferSlater1s1s(PairPot):
     def __cinit__(self, np.ndarray[double, ndim=1] slater1s_widths,
                   np.ndarray[double, ndim=1] slater1s_N, double ct_scale,
                   double rcut, Truncation tr=None, SwitchOn sw=None,
-                  double width_power=3.0):
+                  double width_power=1.0):
         assert slater1s_widths.flags['C_CONTIGUOUS']
         assert slater1s_N.flags['C_CONTIGUOUS']
         # Precompute some factors here???
         pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
         self.set_truncation(tr)
         self.set_switchon(sw)
+        assert width_power == 1
         pair_pot.pair_data_chargetransferslater1s1s_init(self._c_pair_pot, <double*>slater1s_widths.data,  <double*>slater1s_N.data, ct_scale, width_power)
         if not pair_pot.pair_pot_ready(self._c_pair_pot):
             raise MemoryError()
@@ -2312,11 +2315,109 @@ cdef class PairPotChargeTransferSlater1s1s(PairPot):
 
     width_power = property(_get_width_power)
 
-    def _get_alpha(self):
-        '''The alpha parameter in the Ewald summation method'''
-        return pair_pot.pair_data_eidip_get_alpha(self._c_pair_pot)
 
-    alpha = property(_get_alpha)
+cdef class PairPotHBond(PairPot):
+    r'''Model for induction energy that is supposed to mimick hydrogen bonds
+
+            E = hb_scale * slater_overlap**2 * d**3 * q_H / N_A
+
+        **Arguments:**
+
+        slater1s_widths
+            An array of Slater widths, shape = (natom,)
+
+        slater1s_N
+            An array of Slater populations, shape = (natom,)
+
+        qh
+            Charges of the hydrogen atoms (zero if not a hydrogen atom)
+
+        nai
+            1/(Number of electrons in lone pairs), if denominator is smaller than +1
+            it is 0
+
+        hb_scale
+            Linear scaling factor
+
+        rcut
+            The cutoff radius
+
+        **Optional arguments:**
+
+        tr
+            The truncation scheme, an instance of a subclass of ``Truncation``.
+            When not given, no truncation is applied
+
+    '''
+    cdef np.ndarray _c_slater1s_widths
+    cdef np.ndarray _c_slater1s_N
+    cdef np.ndarray _c_qh
+    cdef np.ndarray _c_nai
+    name = 'hbond'
+
+    def __cinit__(self, np.ndarray[double, ndim=1] slater1s_widths,
+                  np.ndarray[double, ndim=1] slater1s_N,
+                  np.ndarray[double, ndim=1] qh,
+                  np.ndarray[double, ndim=1] nai, double hb_scale,
+                  double rcut, Truncation tr=None, SwitchOn sw=None,
+                  ):
+        assert slater1s_widths.flags['C_CONTIGUOUS']
+        assert slater1s_N.flags['C_CONTIGUOUS']
+        # Precompute some factors here???
+        pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
+        self.set_truncation(tr)
+        self.set_switchon(sw)
+        pair_pot.pair_data_hbond_init(self._c_pair_pot, <double*>slater1s_widths.data,  <double*>slater1s_N.data,  <double*>qh.data,  <double*>nai.data, hb_scale)
+        if not pair_pot.pair_pot_ready(self._c_pair_pot):
+            raise MemoryError()
+        self._c_slater1s_widths = slater1s_widths
+        self._c_slater1s_N = slater1s_N
+        self._c_qh = qh
+        self._c_nai = nai
+
+
+    def log(self):
+        '''Print suitable initialization info on screen.'''
+        if log.do_medium:
+            log('  hb_scale:             %s' % ("%10.5f"%self.hb_scale))
+        if log.do_high:
+            log.hline()
+            log('   Atom  Slater charge   Slater width   Hydrogen Charges  Inverse valences')
+            log.hline()
+            for i in xrange(self._c_slater1s_widths.shape[0]):
+                log('%7i     %s     %s     %s     %s' %
+                        (i, log.charge(self._c_slater1s_N[i]),log.length(self._c_slater1s_widths[i]),
+                        log.charge(self._c_qh[i]),log.charge(self._c_nai[i])))
+
+    def _get_slater1s_widths(self):
+        '''The atomic charges'''
+        return self._c_slater1s_widths.view()
+
+    slater1s_widths = property(_get_slater1s_widths)
+
+    def _get_slater1s_N(self):
+        '''The atomic charges'''
+        return self._c_slater1s_N.view()
+
+    slater1s_N = property(_get_slater1s_N)
+
+    def _get_qh(self):
+        '''The atomic charges'''
+        return self._c_qh.view()
+
+    qh = property(_get_qh)
+
+    def _get_nai(self):
+        '''The atomic charges'''
+        return self._c_nai.view()
+
+    nai = property(_get_nai)
+
+    def _get_hb_scale(self):
+        '''The hb_scale parameter in the charge transfer energy expression'''
+        return pair_pot.pair_data_hbond_get_hb_scale(self._c_pair_pot)
+
+    hb_scale = property(_get_hb_scale)
 
 
 

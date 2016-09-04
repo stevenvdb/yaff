@@ -1296,7 +1296,7 @@ def get_part_4113_01WaterWater_chargetransferslater1s1s():
     rcut = 20*angstrom
     # Define some parameters for the exchange term
     ct_scale = 0.01363842
-    width_power = 3.0
+    width_power = 1.0
     # Make the pair potential
     pair_pot = PairPotChargeTransferSlater1s1s(system.slater1s_widths, system.slater1s_N, ct_scale, rcut, width_power=width_power)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
@@ -1362,11 +1362,12 @@ def get_part_4113_01WaterWater_chargetransferslater1s1s():
     rcut = 20*angstrom
     # Define some parameters for the exchange term
     ct_scale = 0.01363842
-    width_power = 3.0
+    width_power = 1.0
     # Make the pair potential
     pair_pot = PairPotChargeTransferSlater1s1s(system.slater1s_widths, system.slater1s_N, ct_scale, rcut, width_power=width_power)
     part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
     def pair_fn(i, j, R, alpha, beta):
+        Ni, Nj = system.slater1s_N[i], system.slater1s_N[j]
         E = 0.0
         delta = beta-alpha
         if np.abs(delta)<0.025:
@@ -1378,7 +1379,47 @@ def get_part_4113_01WaterWater_chargetransferslater1s1s():
         else:
             E = (alpha*np.exp(-R/alpha) + beta*np.exp(-R/beta))/8.0/np.pi/(alpha-beta)**2/(alpha+beta)**2
             E += alpha**2*beta**2*(np.exp(-R/beta) - np.exp(-R/alpha))/2.0/np.pi/R/(alpha-beta)**3/(alpha+beta)**3
-        return -E*ct_scale/(alpha*beta)**width_power
+        E *= -ct_scale/(alpha*beta)**width_power*((Ni/Nj)**2 + (Nj/Ni)**2)*R*R
+        return E
+    return system, nlist, scalings, part_pair, pair_fn
+
+
+
+def get_part_4113_01WaterWater_hbond():
+    # Get a system and define scalings
+    system = get_system_4113_01WaterWater()
+    #system = system.subsystem([2,3])
+    #print system.radii
+    nlist = NeighborList(system)
+    scalings = Scalings(system, 0.0, 0.0, 1.0)
+    rcut = 20*angstrom
+    # Define some parameters for the hbond term
+    hb_scale = 90.0
+    qh = np.zeros(system.natom)
+    mask = system.numbers == 1
+    qh[mask] = system.charges[mask]
+    nai = np.zeros(system.natom)
+    nai[system.numbers==8] = 0.25
+    # Make the pair potential
+    pair_pot = PairPotHBond(system.slater1s_widths, system.slater1s_N, qh, nai, hb_scale, rcut,)
+    part_pair = ForcePartPair(system, nlist, scalings, pair_pot)
+    def pair_fn(i, j, R, alpha, beta):
+        Ni, Nj = system.slater1s_N[i], system.slater1s_N[j]
+        E = 0.0
+        delta = beta-alpha
+        if np.abs(delta)<0.025:
+            alphaR = R/alpha
+            T0 = (alphaR**2+3.0*alphaR+3.0)*np.exp(-alphaR)/192.0/np.pi/alpha**3
+            T1 = (alphaR**3-2.0*alphaR**2-9.0*alphaR-9.0)*np.exp(-alphaR)/384.0/np.pi/alpha**4
+            T2 = (3.0*alphaR**4-25.0*alphaR**3+5.0*alphaR**2+90.0*alphaR+90.0)*np.exp(-alphaR)/1920.0/np.pi/alpha**5
+            S = T0 + T1*delta + 0.5*T2*delta**2
+        else:
+            S = (alpha*np.exp(-R/alpha) + beta*np.exp(-R/beta))/8.0/np.pi/(alpha-beta)**2/(alpha+beta)**2
+            S += alpha**2*beta**2*(np.exp(-R/beta) - np.exp(-R/alpha))/2.0/np.pi/R/(alpha-beta)**3/(alpha+beta)**3
+        fac = qh[i]*nai[j] + qh[j]*nai[i]
+        E = -fac*hb_scale*S**2*R**3*Ni*Nj
+        print "%d %d %+5.1e %+5.1e %+5.1e"% (i, j, fac, S, E)
+        return E
     return system, nlist, scalings, part_pair, pair_fn
 
 
@@ -1441,6 +1482,14 @@ def test_pair_pot_4113_01WaterWater_disp68bjdamp():
 
 def test_pair_pot_4113_01WaterWater_chargetransferslater1s1s():
     system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_chargetransferslater1s1s()
+    check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, 1e-8)
+    check_gpos_part(system, part_pair, nlist)
+    check_vtens_part(system, part_pair, nlist)
+    check_hess_part(system, part_pair, nlist)
+
+
+def test_pair_pot_4113_01WaterWater_hbond():
+    system, nlist, scalings, part_pair, pair_fn = get_part_4113_01WaterWater_hbond()
     check_pair_pot_4113_01WaterWater(system, nlist, scalings, part_pair, pair_fn, 1e-8)
     check_gpos_part(system, part_pair, nlist)
     check_vtens_part(system, part_pair, nlist)

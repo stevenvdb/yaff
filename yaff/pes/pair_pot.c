@@ -1045,32 +1045,44 @@ void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *sl
 
 
 double pair_fn_chargetransferslater1s1s(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *gg,  double *g_cart) {
-  double a, b, Na, Nb, fac;
+  double a, b, Na, Nb, fac, olp;
   double pot = 0.0;
   a  = (*(pair_data_olpslater1s1s_type*)pair_data).widths[center_index];
   b  = (*(pair_data_olpslater1s1s_type*)pair_data).widths[other_index];
   Na = (*(pair_data_olpslater1s1s_type*)pair_data).N[center_index];
   Nb = (*(pair_data_olpslater1s1s_type*)pair_data).N[other_index];
-  // Overlap between unit Slater densities
-  pot = slaterolp_0_0(a, b, d, g, gg);
-  // Multiply with scaling factor and populations
-  pot *= -Na*Nb*(*(pair_data_chargetransferslater1s1s_type*)pair_data).ct_scale;
-  if (g != NULL) *g *= -Na*Nb*(*(pair_data_chargetransferslater1s1s_type*)pair_data).ct_scale;
-  if (gg != NULL) *gg *= -Na*Nb*(*(pair_data_chargetransferslater1s1s_type*)pair_data).ct_scale;
-  // Multiply with power of widths
-  // TODO: this power will likely be integer, so this could be implemented more efficiently
-  double wp = (*(pair_data_chargetransferslater1s1s_type*)pair_data).width_power;
-  if (wp != 0.0) {
-    if (wp == 3.0) {
-      fac = 1.0/a/b;
-      fac *= fac*fac;
-    } else {
-      fac = pow( 1.0/a/b, wp);
-    }
-    pot *= fac;
-    if (g != NULL) *g *= fac;
-    if (gg != NULL) *gg *= fac;
-  }
+
+  olp = slaterolp_0_0(a, b, d, g, gg);
+  fac = -Na*Nb*(*(pair_data_chargetransferslater1s1s_type*)pair_data).ct_scale;
+  fac *= ( (Na/Nb)*(Na/Nb) + (Nb/Na)*(Nb/Na) ) / (a*b);
+  pot = fac*olp*d*d;
+  if (gg != NULL) *gg = fac*((*gg)*d*d + 4.0*(*g) + 2.0*olp/d/d);
+  if (g != NULL) *g = fac*(2.0*olp+(*g)*d*d);
+  return pot;
+
+
+/*  // Overlap between unit Slater densities*/
+/*  pot = slaterolp_0_0(a, b, d, g, gg);*/
+/*  // Multiply with scaling factor and populations*/
+/*  pot *= -Na*Nb*(*(pair_data_chargetransferslater1s1s_type*)pair_data).ct_scale*d**2;*/
+/*  if (g != NULL) *g *= -Na*Nb*(*(pair_data_chargetransferslater1s1s_type*)pair_data).ct_scale;*/
+/*  if (gg != NULL) *gg *= -Na*Nb*(*(pair_data_chargetransferslater1s1s_type*)pair_data).ct_scale;*/
+/*  // Multiply with power of widths*/
+/*  // TODO: this power will likely be integer, so this could be implemented more efficiently*/
+/*  double wp = (*(pair_data_chargetransferslater1s1s_type*)pair_data).width_power;*/
+/*  fac = (Na/Nb)*(Na/Nb) + (Nb/Na)*(Nb/Na);*/
+/*  if (wp != 0.0) {*/
+/*    if (wp == 1.0) {*/
+/*      fac *= 1.0/a/b;*/
+/*      //fac *= fac*fac;*/
+/*    } else {*/
+/*      fac *= pow( 1.0/a/b, wp);*/
+/*    }*/
+/*  }*/
+/*  pot *= fac;*/
+/*  if (g != NULL) *g *= fac;*/
+/*  if (gg != NULL) *gg *= fac;*/
+/*  printf("%5d %5d %+20.12f\n",center_index,other_index,pot);*/
   return pot;
 }
 
@@ -1080,4 +1092,52 @@ double pair_data_chargetransferslater1s1s_get_ct_scale(pair_pot_type *pair_pot) 
 
 double pair_data_chargetransferslater1s1s_get_width_power(pair_pot_type *pair_pot) {
   return (*(pair_data_chargetransferslater1s1s_type*)((*pair_pot).pair_data)).width_power;
+}
+
+
+void pair_data_hbond_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double *qh, double *nai, double hb_scale) {
+  pair_data_hbond_type *pair_data;
+  pair_data = (pair_data_hbond_type*)malloc(sizeof(pair_data_hbond_type));
+  (*pair_pot).pair_data = pair_data;
+  if (pair_data != NULL) {
+    (*pair_pot).pair_fn = pair_fn_hbond;
+    (*pair_data).widths = slater1s_widths;
+    (*pair_data).N = slater1s_N;
+    (*pair_data).qh = qh;
+    (*pair_data).nai = nai;
+    (*pair_data).hb_scale = hb_scale;
+  }
+}
+
+
+double pair_fn_hbond(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *gg,  double *g_cart) {
+  double a, b, Na, Nb, qha, qhb, naia, naib, fac, olp, d2, d3;
+  double pot = 0.0;
+  a  = (*(pair_data_hbond_type*)pair_data).widths[center_index];
+  b  = (*(pair_data_hbond_type*)pair_data).widths[other_index];
+  Na = (*(pair_data_hbond_type*)pair_data).N[center_index];
+  Nb = (*(pair_data_hbond_type*)pair_data).N[other_index];
+  qha =(*(pair_data_hbond_type*)pair_data).qh[center_index];
+  qhb =(*(pair_data_hbond_type*)pair_data).qh[other_index];
+  naia=(*(pair_data_hbond_type*)pair_data).nai[center_index];
+  naib=(*(pair_data_hbond_type*)pair_data).nai[other_index];
+  // Prefactor
+  fac = qha*naib + qhb*naia;
+  if (fac == 0.0) return 0.0;
+  // Modify prefactor
+  fac *= -(*(pair_data_hbond_type*)pair_data).hb_scale*Na*Nb*Na*Nb;
+  // Overlap
+  olp = slaterolp_0_0(a, b, d, g, gg);
+  // Powers of d
+  d2 = d*d;
+  d3 = d2*d;
+  // Final potential
+  pot = fac*olp*olp*d3;
+  if (gg != NULL) *gg = 2.0*fac*(3.0*olp*olp/d + 6.0*olp*(*g)*d + d3*(*g)*(*g) + olp*d3*(*gg));//Something wrong here
+  if (g != NULL)  *g = fac*olp*(3.0*olp*d + 2.0*d3*(*g));
+  return pot;
+}
+
+double pair_data_hbond_get_hb_scale(pair_pot_type *pair_pot) {
+  return (*(pair_data_hbond_type*)((*pair_pot).pair_data)).hb_scale;
 }

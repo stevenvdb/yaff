@@ -139,8 +139,9 @@ def check_hess_part(system, part, nlists=None):
     if nlists is not None:
         nlists.update()
     hessian_ana = np.zeros((np.prod(system.pos.shape),np.prod(system.pos.shape)),float)
+    gpos = np.zeros(system.pos.shape, float)
     part.compute(hess=hessian_ana)
-    hessian_num = estimate_cart_hessian(ForceField(system, [part], nlists))
+    hessian_num = estimate_cart_hessian(ForceField(system, [part], nlists),eps=1e-6)
     check_hess(hessian_ana, hessian_num)
 
 
@@ -205,6 +206,9 @@ def check_hess(hessian_ana, hessian_num):
     av_err = np.mean((hessian_num-hessian_ana)**2)
     # To compute a meaningful relative error, mask out very small reference values
     mask = np.abs(hessian_num) > 1e-7
+    #    for i in xrange(hessian_ana.shape[0]):
+    #        for j in xrange(hessian_ana.shape[0]):
+    #            print "%3d %3d %+12.2e %+12.2e" % (i,j,hessian_ana[i,j],hessian_num[i,j])
     if np.sum(mask)>0:
         max_relerr = np.amax( (hessian_ana[mask]/hessian_num[mask]-1.0)**2)
         index_relerr = np.argmax( (hessian_ana[mask]/hessian_num[mask]-1.0)**2)
