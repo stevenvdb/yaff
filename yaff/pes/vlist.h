@@ -32,9 +32,10 @@ typedef struct {
   double par0, par1, par2, par3;//, par4, par5;
   long ic0, ic1;//, ic2;
   double energy;
+  long i0, i1, i2, i3, ni;
 } vlist_row_type;
 
-double vlist_forward(iclist_row_type* ictab, vlist_row_type* vtab, long nv);
+double vlist_forward(iclist_row_type* ictab, vlist_row_type* vtab, long nv, double* aenergies);
 void vlist_back(iclist_row_type* ictab, vlist_row_type* vtab, long nv);
 
 #endif

@@ -1816,6 +1816,7 @@ def iclist_forward(np.ndarray[dlist.dlist_row_type, ndim=1] deltas,
 
        nic
             The number of records in the ``ictab`` array to compute.
+
     '''
     assert deltas.flags['C_CONTIGUOUS']
     assert ictab.flags['C_CONTIGUOUS']
@@ -1823,7 +1824,8 @@ def iclist_forward(np.ndarray[dlist.dlist_row_type, ndim=1] deltas,
                           <iclist.iclist_row_type*>ictab.data, nic)
 
 def iclist_back(np.ndarray[dlist.dlist_row_type, ndim=1] deltas,
-                np.ndarray[iclist.iclist_row_type, ndim=1] ictab, long nic):
+                np.ndarray[iclist.iclist_row_type, ndim=1] ictab, long nic,
+                np.ndarray[double, ndim=3] avtens):
     '''The back-propagation step in the internal coordinate list
 
        deltas
@@ -1835,14 +1837,28 @@ def iclist_back(np.ndarray[dlist.dlist_row_type, ndim=1] deltas,
        nic
             The number of records in the ``ictab`` array to compute.
 
+       avtens
+            If not set to None, the atomic virial tensors are computed and
+            stored in this array. numpy array with shape (natom, 3, 3).
+
        This routine transforms the partial derivatives of the energy towards the
        internal coordinates, stored in ``ictab``, into partial derivatives of
        the energy towards relative vectors, added to ``deltas``.
     '''
     assert deltas.flags['C_CONTIGUOUS']
     assert ictab.flags['C_CONTIGUOUS']
+
+    if avtens is None:
+        my_avtens = NULL
+    else:
+        assert avtens.flags['C_CONTIGUOUS']
+        assert avtens.shape[2] == 3
+        assert avtens.shape[1] == 3
+        my_avtens = <double*>avtens.data
+
     iclist.iclist_back(<dlist.dlist_row_type*>deltas.data,
-                       <iclist.iclist_row_type*>ictab.data, nic)
+                       <iclist.iclist_row_type*>ictab.data, nic,
+                       my_avtens)
 
 
 #
@@ -1851,7 +1867,8 @@ def iclist_back(np.ndarray[dlist.dlist_row_type, ndim=1] deltas,
 
 
 def vlist_forward(np.ndarray[iclist.iclist_row_type, ndim=1] ictab,
-                  np.ndarray[vlist.vlist_row_type, ndim=1] vtab, long nv):
+                  np.ndarray[vlist.vlist_row_type, ndim=1] vtab, long nv,
+                  np.ndarray[double, ndim=1] aenergies):
     '''Computes valence energy terms based on a list of internal coordinates
 
        **Arguments:**
@@ -1864,11 +1881,23 @@ def vlist_forward(np.ndarray[iclist.iclist_row_type, ndim=1] ictab,
 
        nv
             The number of records to consider in ``vtab``.
+
+       aenergies
+            If not set to None, the atomic energies are stored in this
+            (natom,) NumPy array
     '''
     assert ictab.flags['C_CONTIGUOUS']
     assert vtab.flags['C_CONTIGUOUS']
+
+    if aenergies is None:
+        my_aenergies = NULL
+    else:
+        assert aenergies.flags['C_CONTIGUOUS']
+        my_aenergies = <double*>aenergies.data
+
     return vlist.vlist_forward(<iclist.iclist_row_type*>ictab.data,
-                               <vlist.vlist_row_type*>vtab.data, nv)
+                               <vlist.vlist_row_type*>vtab.data, nv,
+                               my_aenergies)
 
 def vlist_back(np.ndarray[iclist.iclist_row_type, ndim=1] ictab,
                np.ndarray[vlist.vlist_row_type, ndim=1] vtab, long nv):

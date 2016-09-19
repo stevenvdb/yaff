@@ -34,6 +34,6 @@ typedef struct {
 } iclist_row_type;
 
 void iclist_forward(dlist_row_type* deltas, iclist_row_type* ictab, long nic);
-void iclist_back(dlist_row_type* deltas, iclist_row_type* ictab, long nic);
+void iclist_back(dlist_row_type* deltas, iclist_row_type* ictab, long nic, double* avtens);
 
 #endif

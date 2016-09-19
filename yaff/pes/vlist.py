@@ -76,6 +76,9 @@ vlist_dtype = [
     ('ic0', int), ('ic1', int),         # Indexes of rows in the table of internal coordinates. (See InternalCoordinatList class.)
 #    ('ic2', int),
     ('energy', float),                  # The computed value of the energy, output of forward method.
+    ('i0', int), ('i1', int),           # Indeces of atoms appearing in valence term expression
+    ('i2', int), ('i3', int),
+    ('ni', int),                        # Number of indices of atoms
 ]
 
 
@@ -111,18 +114,36 @@ class ValenceList(object):
         for i in xrange(len(term.pars)):
             self.vtab[row]['par%i'%i] = term.pars[i]
         ic_indexes = term.get_ic_indexes(self.iclist) # registers ics in InternalCoordinateList.
+        # Array index correspond to ic kind, array entry to number of relative
+        # vectors needed to specify ic. E.g. a bond (kind=0) needs 1 relative
+        # vector
+        nrels = np.array([1,2,2,3,3,1,3,3,3,3,3])
+        dindexes = []
         for i in xrange(len(ic_indexes)):
             self.vtab[row]['ic%i'%i] = ic_indexes[i]
+            # Number of relative vectors involved in this ic
+            nrel = nrels[self.iclist.ictab[ic_indexes[i]]['kind']]
+            # Add two atoms from those relative vectors to the list
+            for irel in xrange(nrel):
+                indexrel = self.iclist.ictab[ic_indexes[i]]['i%d'%irel]
+                dindexes.append(self.iclist.dlist.deltas[indexrel]['i'])
+                dindexes.append(self.iclist.dlist.deltas[indexrel]['j'])
+        # Remove duplicates
+        dindexes = list(set(dindexes))
+        # Store information in vlist
+        for idindex, dindex in enumerate(dindexes):
+            self.vtab[row]['i%i'%idindex] = dindex
+        self.vtab[row]['ni'] = len(dindexes)
         self.nv += 1
 
-    def forward(self):
+    def forward(self, aenergies=None):
         """Compute the values of the energy terms, based on the values of the
            internal coordinates list, and store the result in the ``self.vtab``
            table.
 
            The actual computation is carried out by a low-level C routine.
         """
-        return vlist_forward(self.iclist.ictab, self.vtab, self.nv)
+        return vlist_forward(self.iclist.ictab, self.vtab, self.nv, aenergies)
 
     def back(self):
         """Compute the derivatives of the energy terms towards the internal

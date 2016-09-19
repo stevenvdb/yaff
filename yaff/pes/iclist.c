@@ -23,6 +23,7 @@
 
 #include <math.h>
 #include "iclist.h"
+#include "constants.h"
 #include <stdio.h>
 
 typedef double (*ic_forward_type)(iclist_row_type*, dlist_row_type*);
@@ -189,22 +190,49 @@ void iclist_forward(dlist_row_type* deltas, iclist_row_type* ictab, long nic) {
 }
 
 
-typedef void (*ic_back_type)(iclist_row_type*, dlist_row_type*, double, double);
+typedef void (*ic_back_type)(iclist_row_type*, dlist_row_type*, double, double, double*);
 
-void back_bond(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad) {
+void back_bond(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad, double *avtens) {
   dlist_row_type *delta;
-  double x;
+  double x, fx0, fy0, fz0;
   delta = deltas + (*ic).i0;
   x = grad/value;
-  (*delta).gx += x*(*delta).dx;
-  (*delta).gy += x*(*delta).dy;
-  (*delta).gz += x*(*delta).dz;
+  fx0 = x*(*delta).dx;
+  fy0 = x*(*delta).dy;
+  fz0 = x*(*delta).dz;
+  (*delta).gx += fx0;
+  (*delta).gy += fy0;
+  (*delta).gz += fz0;
+  if (avtens != NULL) {
+      // Forces from i on j, factor 0.5 for two-body
+      fx0 *= 0.5*(*ic).sign0;
+      fy0 *= 0.5*(*ic).sign0;
+      fz0 *= 0.5*(*ic).sign0;
+      // Figure out (i,j,k) indexes of particles present in ic
+      long indexes[2], i;
+      indexes[0] = (*delta).i;
+      indexes[1] = (*delta).j;
+      printf("INDEXES %5ld %5ld\n",indexes[0],indexes[1]);
+      // Fill atomic virial tensors for every particle in ic
+      for (i=0;i<2;i++) {
+        avtens[indexes[i]*9  ] += fx0*(*delta).dx;
+        avtens[indexes[i]*9+1] += fx0*(*delta).dy;
+        avtens[indexes[i]*9+2] += fx0*(*delta).dz;
+        avtens[indexes[i]*9+3] += fy0*(*delta).dx;
+        avtens[indexes[i]*9+4] += fy0*(*delta).dy;
+        avtens[indexes[i]*9+5] += fy0*(*delta).dz;
+        avtens[indexes[i]*9+6] += fz0*(*delta).dx;
+        avtens[indexes[i]*9+7] += fz0*(*delta).dy;
+        avtens[indexes[i]*9+8] += fz0*(*delta).dz;
+      }
+  }
 }
 
-void back_bend_cos(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad) {
+void back_bend_cos(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad, double *avtens) {
   dlist_row_type *delta0, *delta1;
   double e0[3], e1[3];
   double d0, d1, fac;
+  double fx0, fx1, fy0, fy1, fz0, fz1;
   delta0 = deltas + (*ic).i0;
   delta1 = deltas + (*ic).i1;
   d0 = sqrt((*delta0).dx*(*delta0).dx + (*delta0).dy*(*delta0).dy + (*delta0).dz*(*delta0).dz);
@@ -219,24 +247,70 @@ void back_bend_cos(iclist_row_type* ic, dlist_row_type* deltas, double value, do
   grad *= fac;
   value *= fac;
   fac = grad/d0;
-  (*delta0).gx += fac*(e1[0] - value*e0[0]);
-  (*delta0).gy += fac*(e1[1] - value*e0[1]);
-  (*delta0).gz += fac*(e1[2] - value*e0[2]);
+  fx0 = fac*(e1[0] - value*e0[0]);
+  fy0 = fac*(e1[1] - value*e0[1]);
+  fz0 = fac*(e1[2] - value*e0[2]);
+  (*delta0).gx += fx0;
+  (*delta0).gy += fy0;
+  (*delta0).gz += fz0;
   fac = grad/d1;
-  (*delta1).gx += fac*(e0[0] - value*e1[0]);
-  (*delta1).gy += fac*(e0[1] - value*e1[1]);
-  (*delta1).gz += fac*(e0[2] - value*e1[2]);
+  fx1 = fac*(e0[0] - value*e1[0]);
+  fy1 = fac*(e0[1] - value*e1[1]);
+  fz1 = fac*(e0[2] - value*e1[2]);
+  (*delta1).gx += fx1;
+  (*delta1).gy += fy1;
+  (*delta1).gz += fz1;
+  if (avtens != NULL) {
+      // Forces from i on j, factor M_THIRD for three-body
+      fx0 *= M_THIRD;//*(*ic).sign0;
+      fy0 *= M_THIRD;//*(*ic).sign0;
+      fz0 *= M_THIRD;//*(*ic).sign0;
+      // Forces from k on j, factor M_THIRD for three-body
+      fx1 *= M_THIRD;//*(*ic).sign1;
+      fy1 *= M_THIRD;//*(*ic).sign1;
+      fz1 *= M_THIRD;//*(*ic).sign1;
+      // Figure out (i,j,k) indexes of particles present in ic
+      long indexes[3], i;
+      if ((*ic).sign0==1) {
+        indexes[0] = (*delta0).j;
+        indexes[1] = (*delta0).i;
+      }
+      else {
+        indexes[1] = (*delta0).j;
+        indexes[0] = (*delta0).i;
+      }
+      if ((*ic).sign1==1) {
+        indexes[2] = (*delta1).j;
+      }
+      else {
+        indexes[2] = (*delta1).i;
+      }
+      printf("INDEXES %5ld %5ld %5ld\n",indexes[0],indexes[1],indexes[2]);
+      // Fill atomic virial tensors for every particle in ic
+      for (i=0;i<3;i++) {
+          avtens[indexes[i]*9  ] += fx0*(*delta0).dx+fx1*(*delta1).dx;
+          avtens[indexes[i]*9+1] += fx0*(*delta0).dy+fx1*(*delta1).dy;
+          avtens[indexes[i]*9+2] += fx0*(*delta0).dz+fx1*(*delta1).dz;
+          avtens[indexes[i]*9+3] += fy0*(*delta0).dx+fy1*(*delta1).dx;
+          avtens[indexes[i]*9+4] += fy0*(*delta0).dy+fy1*(*delta1).dy;
+          avtens[indexes[i]*9+5] += fy0*(*delta0).dz+fy1*(*delta1).dz;
+          avtens[indexes[i]*9+6] += fz0*(*delta0).dx+fz1*(*delta1).dx;
+          avtens[indexes[i]*9+7] += fz0*(*delta0).dy+fz1*(*delta1).dy;
+          avtens[indexes[i]*9+8] += fz0*(*delta0).dz+fz1*(*delta1).dz;
+      }
+  }
 }
 
-void back_bend_angle(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad) {
-  back_bend_cos(ic, deltas, cos(value), -grad/sin(value));
+void back_bend_angle(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad, double *avtens) {
+  back_bend_cos(ic, deltas, cos(value), -grad/sin(value), avtens);
 }
 
-void back_dihed_cos(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad) {
+void back_dihed_cos(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad, double *avtens) {
   long i;
   dlist_row_type *delta0, *delta1, *delta2;
   double a[3], b[3], dcos_da[3], dcos_db[3], da_ddel0[9], da_ddel1[9], db_ddel1[9];
   double dot0, dot2, n1, na, nb;
+  double fx0, fx1, fx2, fy0, fy1, fy2, fz0, fz1, fz2;
 
   delta0 = deltas + (*ic).i0;
   delta1 = deltas + (*ic).i1;
@@ -293,27 +367,87 @@ void back_dihed_cos(iclist_row_type* ic, dlist_row_type* deltas, double value, d
   db_ddel1[7] = (                - (*delta2).dz*(*delta1).dy/(n1*n1) + 2*dot2/(n1*n1*n1*n1)*(*delta1).dz*(*delta1).dy );
   db_ddel1[8] = ( - dot2/(n1*n1) - (*delta2).dz*(*delta1).dz/(n1*n1) + 2*dot2/(n1*n1*n1*n1)*(*delta1).dz*(*delta1).dz );
 
-  (*delta0).gx += grad*(  dcos_da[0]*da_ddel0[0] + dcos_da[1]*da_ddel0[3] + dcos_da[2]*da_ddel0[6]);
-  (*delta0).gy += grad*(  dcos_da[0]*da_ddel0[1] + dcos_da[1]*da_ddel0[4] + dcos_da[2]*da_ddel0[7]);
-  (*delta0).gz += grad*(  dcos_da[0]*da_ddel0[2] + dcos_da[1]*da_ddel0[5] + dcos_da[2]*da_ddel0[8]);
-  (*delta1).gx += grad*(  dcos_da[0]*da_ddel1[0] + dcos_da[1]*da_ddel1[3] + dcos_da[2]*da_ddel1[6]
+  fx0 = grad*(  dcos_da[0]*da_ddel0[0] + dcos_da[1]*da_ddel0[3] + dcos_da[2]*da_ddel0[6]);
+  fy0 = grad*(  dcos_da[0]*da_ddel0[1] + dcos_da[1]*da_ddel0[4] + dcos_da[2]*da_ddel0[7]);
+  fz0 = grad*(  dcos_da[0]*da_ddel0[2] + dcos_da[1]*da_ddel0[5] + dcos_da[2]*da_ddel0[8]);
+  fx1 = grad*(  dcos_da[0]*da_ddel1[0] + dcos_da[1]*da_ddel1[3] + dcos_da[2]*da_ddel1[6]
                         + dcos_db[0]*db_ddel1[0] + dcos_db[1]*db_ddel1[3] + dcos_db[2]*db_ddel1[6]);
-  (*delta1).gy += grad*(  dcos_da[0]*da_ddel1[1] + dcos_da[1]*da_ddel1[4] + dcos_da[2]*da_ddel1[7]
+  fy1 = grad*(  dcos_da[0]*da_ddel1[1] + dcos_da[1]*da_ddel1[4] + dcos_da[2]*da_ddel1[7]
                         + dcos_db[0]*db_ddel1[1] + dcos_db[1]*db_ddel1[4] + dcos_db[2]*db_ddel1[7]);
-  (*delta1).gz += grad*(  dcos_da[0]*da_ddel1[2] + dcos_da[1]*da_ddel1[5] + dcos_da[2]*da_ddel1[8]
+  fz1 = grad*(  dcos_da[0]*da_ddel1[2] + dcos_da[1]*da_ddel1[5] + dcos_da[2]*da_ddel1[8]
                         + dcos_db[0]*db_ddel1[2] + dcos_db[1]*db_ddel1[5] + dcos_db[2]*db_ddel1[8]);
-  (*delta2).gx += grad*(  dcos_db[0]*da_ddel0[0] + dcos_db[1]*da_ddel0[3] + dcos_db[2]*da_ddel0[6]);
-  (*delta2).gy += grad*(  dcos_db[0]*da_ddel0[1] + dcos_db[1]*da_ddel0[4] + dcos_db[2]*da_ddel0[7]);
-  (*delta2).gz += grad*(  dcos_db[0]*da_ddel0[2] + dcos_db[1]*da_ddel0[5] + dcos_db[2]*da_ddel0[8]);
+  fx2 = grad*(  dcos_db[0]*da_ddel0[0] + dcos_db[1]*da_ddel0[3] + dcos_db[2]*da_ddel0[6]);
+  fy2 = grad*(  dcos_db[0]*da_ddel0[1] + dcos_db[1]*da_ddel0[4] + dcos_db[2]*da_ddel0[7]);
+  fz2 = grad*(  dcos_db[0]*da_ddel0[2] + dcos_db[1]*da_ddel0[5] + dcos_db[2]*da_ddel0[8]);
+
+  (*delta0).gx += fx0;
+  (*delta0).gy += fy0;
+  (*delta0).gz += fz0;
+  (*delta1).gx += fx1;
+  (*delta1).gy += fy1;
+  (*delta1).gz += fz1;
+  (*delta2).gx += fx2;
+  (*delta2).gy += fy2;
+  (*delta2).gz += fz2;
+
+  if (avtens != NULL) {
+      // Forces from i on j, factor 0.25 for four-body
+      fx0 *= 0.25;
+      fy0 *= 0.25;
+      fz0 *= 0.25;
+      // Forces from k on j, factor 0.25 for four-body
+      fx1 *= 0.25;
+      fy1 *= 0.25;
+      fz1 *= 0.25;
+      // Forces from l on k, factor 0.25 for four-body
+      fx2 *= 0.25;
+      fy2 *= 0.25;
+      fz2 *= 0.25;
+      // Figure out (i,j,k,l) indexes of particles present in ic
+      long indexes[4], i;
+      if ((*ic).sign0==1) {
+        indexes[0] = (*delta0).j;
+        indexes[1] = (*delta0).i;
+      }
+      else {
+        indexes[1] = (*delta0).j;
+        indexes[0] = (*delta0).i;
+      }
+      if ((*ic).sign1==1) {
+        indexes[2] = (*delta1).j;
+      }
+      else {
+        indexes[2] = (*delta1).i;
+      }
+      if ((*ic).sign2==1) {
+        indexes[3] = (*delta2).j;
+      }
+      else {
+        indexes[3] = (*delta2).i;
+      }
+      printf("INDEXES %5ld %5ld %5ld %5ld\n",indexes[0],indexes[1],indexes[2],indexes[3]);
+      // Fill atomic virial tensors for every particle in ic
+      for (i=0;i<4;i++) {
+          avtens[indexes[i]*9  ] += fx0*(*delta0).dx+fx1*(*delta1).dx+fx2*(*delta2).dx;
+          avtens[indexes[i]*9+1] += fx0*(*delta0).dy+fx1*(*delta1).dy+fx2*(*delta2).dy;
+          avtens[indexes[i]*9+2] += fx0*(*delta0).dz+fx1*(*delta1).dz+fx2*(*delta2).dz;
+          avtens[indexes[i]*9+3] += fy0*(*delta0).dx+fy1*(*delta1).dx+fy2*(*delta2).dx;
+          avtens[indexes[i]*9+4] += fy0*(*delta0).dy+fy1*(*delta1).dy+fy2*(*delta2).dy;
+          avtens[indexes[i]*9+5] += fy0*(*delta0).dz+fy1*(*delta1).dz+fy2*(*delta2).dz;
+          avtens[indexes[i]*9+6] += fz0*(*delta0).dx+fz1*(*delta1).dx+fz2*(*delta2).dx;
+          avtens[indexes[i]*9+7] += fz0*(*delta0).dy+fz1*(*delta1).dy+fz2*(*delta2).dy;
+          avtens[indexes[i]*9+8] += fz0*(*delta0).dz+fz1*(*delta1).dz+fz2*(*delta2).dz;
+      }
+  }
 }
 
-void back_dihed_angle(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad) {
+void back_dihed_angle(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad, double *avtens) {
   double tmp = sin(value);
   if (tmp!=0.0) tmp = -grad/tmp;
-  back_dihed_cos(ic, deltas, cos(value), tmp);
+  back_dihed_cos(ic, deltas, cos(value), tmp, avtens);
 }
 
-void back_oop_cos_low(dlist_row_type *delta0, dlist_row_type *delta1, dlist_row_type *delta2, double value, double grad) {
+void back_oop_cos_low(iclist_row_type* ic, dlist_row_type *delta0, dlist_row_type *delta1, dlist_row_type *delta2, double value, double grad, double *avtens) {
   // This calculation is tedious. Expressions are checked with the following
   // maple commands (assuming the maple worksheet is bug-free)
   /*
@@ -356,6 +490,7 @@ void back_oop_cos_low(dlist_row_type *delta0, dlist_row_type *delta1, dlist_row_
   */
   double n[3], d0_cross_d1[3], d1_cross_d2[3], d2_cross_d0[3];
   double n_sq, d2_sq, n_dot_d2, fac, tmp0, tmp1, tmp2;
+  double fx0, fx1, fx2, fy0, fy1, fy2, fz0, fz1, fz2;
   // Cross products of delta vectors (introduce a function vectorproduct() ?)
   d0_cross_d1[0] = (*delta0).dy * (*delta1).dz - (*delta0).dz * (*delta1).dy;
   d0_cross_d1[1] = (*delta0).dz * (*delta1).dx - (*delta0).dx * (*delta1).dz;
@@ -383,71 +518,134 @@ void back_oop_cos_low(dlist_row_type *delta0, dlist_row_type *delta1, dlist_row_
   tmp0 = fac/value;
   tmp1 = n_dot_d2/n_sq;
   tmp2 = n_dot_d2/d2_sq;
-  (*delta0).gx += - tmp0*grad*( d1_cross_d2[0] -  tmp1*( (*delta1).dy*n[2] - (*delta1).dz*n[1] ) );
-  (*delta0).gy += - tmp0*grad*( d1_cross_d2[1] -  tmp1*( (*delta1).dz*n[0] - (*delta1).dx*n[2] ) );
-  (*delta0).gz += - tmp0*grad*( d1_cross_d2[2] -  tmp1*( (*delta1).dx*n[1] - (*delta1).dy*n[0] ) );
-  (*delta1).gx += - tmp0*grad*( d2_cross_d0[0] -  tmp1*( (*delta0).dz*n[1] - (*delta0).dy*n[2] ) );
-  (*delta1).gy += - tmp0*grad*( d2_cross_d0[1] -  tmp1*( (*delta0).dx*n[2] - (*delta0).dz*n[0] ) );
-  (*delta1).gz += - tmp0*grad*( d2_cross_d0[2] -  tmp1*( (*delta0).dy*n[0] - (*delta0).dx*n[1] ) );
-  (*delta2).gx += - tmp0*grad*( d0_cross_d1[0] -  tmp2*(*delta2).dx );
-  (*delta2).gy += - tmp0*grad*( d0_cross_d1[1] -  tmp2*(*delta2).dy );
-  (*delta2).gz += - tmp0*grad*( d0_cross_d1[2] -  tmp2*(*delta2).dz );
+  fx0 = - tmp0*grad*( d1_cross_d2[0] -  tmp1*( (*delta1).dy*n[2] - (*delta1).dz*n[1] ) );
+  fy0 = - tmp0*grad*( d1_cross_d2[1] -  tmp1*( (*delta1).dz*n[0] - (*delta1).dx*n[2] ) );
+  fz0 = - tmp0*grad*( d1_cross_d2[2] -  tmp1*( (*delta1).dx*n[1] - (*delta1).dy*n[0] ) );
+  fx1 = - tmp0*grad*( d2_cross_d0[0] -  tmp1*( (*delta0).dz*n[1] - (*delta0).dy*n[2] ) );
+  fy1 = - tmp0*grad*( d2_cross_d0[1] -  tmp1*( (*delta0).dx*n[2] - (*delta0).dz*n[0] ) );
+  fz1 = - tmp0*grad*( d2_cross_d0[2] -  tmp1*( (*delta0).dy*n[0] - (*delta0).dx*n[1] ) );
+  fx2 = - tmp0*grad*( d0_cross_d1[0] -  tmp2*(*delta2).dx );
+  fy2 = - tmp0*grad*( d0_cross_d1[1] -  tmp2*(*delta2).dy );
+  fz2 = - tmp0*grad*( d0_cross_d1[2] -  tmp2*(*delta2).dz );
+
+  (*delta0).gx += fx0;
+  (*delta0).gy += fy0;
+  (*delta0).gz += fz0;
+  (*delta1).gx += fx1;
+  (*delta1).gy += fy1;
+  (*delta1).gz += fz1;
+  (*delta2).gx += fx2;
+  (*delta2).gy += fy2;
+  (*delta2).gz += fz2;
+
+  if (avtens != NULL) {
+      // Forces from l on i, factor 0.25 for four-body
+      fx0 *= 0.25;
+      fy0 *= 0.25;
+      fz0 *= 0.25;
+      // Forces from l on j, factor 0.25 for four-body
+      fx1 *= 0.25;
+      fy1 *= 0.25;
+      fz1 *= 0.25;
+      // Forces from l on k, factor 0.25 for four-body
+      fx2 *= 0.25;
+      fy2 *= 0.25;
+      fz2 *= 0.25;
+      // Figure out (i,j,k,l) indexes of particles present in ic
+      long indexes[4], i;
+      if ((*ic).sign0==1) {
+        indexes[0] = (*delta0).i;
+        indexes[3] = (*delta0).j;
+      }
+      else {
+        indexes[3] = (*delta0).i;
+        indexes[0] = (*delta0).j;
+      }
+      if ((*ic).sign1==1) {
+        indexes[1] = (*delta1).i;
+      }
+      else {
+        indexes[1] = (*delta1).j;
+      }
+      if ((*ic).sign2==1) {
+        indexes[2] = (*delta2).i;
+      }
+      else {
+        indexes[2] = (*delta2).j;
+      }
+      printf("INDEXES %5ld %5ld %5ld %5ld\n",indexes[0],indexes[1],indexes[2],indexes[3]);
+      printf("FORCES %+12.8f %+12.8f %+12.8f %+12.8f %+12.8f %+12.8f %+12.8f %+12.8f %+12.8f\n",fx0,fy0,fz0,fx1,fy1,fz1,fx2,fy2,fz2);
+      printf("DISTS  %+12.8f %+12.8f %+12.8f %+12.8f %+12.8f %+12.8f %+12.8f %+12.8f %+12.8f\n",(*delta0).dx,(*delta0).dy,(*delta0).dz,(*delta1).dx,(*delta1).dy,(*delta1).dz,(*delta2).dx,(*delta2).dy,(*delta2).dz);
+      // Fill atomic virial tensors for every particle in ic
+      for (i=0;i<4;i++) {
+          avtens[indexes[i]*9  ] += fx0*(*delta0).dx+fx1*(*delta1).dx+fx2*(*delta2).dx;
+          avtens[indexes[i]*9+1] += fx0*(*delta0).dy+fx1*(*delta1).dy+fx2*(*delta2).dy;
+          avtens[indexes[i]*9+2] += fx0*(*delta0).dz+fx1*(*delta1).dz+fx2*(*delta2).dz;
+          avtens[indexes[i]*9+3] += fy0*(*delta0).dx+fy1*(*delta1).dx+fy2*(*delta2).dx;
+          avtens[indexes[i]*9+4] += fy0*(*delta0).dy+fy1*(*delta1).dy+fy2*(*delta2).dy;
+          avtens[indexes[i]*9+5] += fy0*(*delta0).dz+fy1*(*delta1).dz+fy2*(*delta2).dz;
+          avtens[indexes[i]*9+6] += fz0*(*delta0).dx+fz1*(*delta1).dx+fz2*(*delta2).dx;
+          avtens[indexes[i]*9+7] += fz0*(*delta0).dy+fz1*(*delta1).dy+fz2*(*delta2).dy;
+          avtens[indexes[i]*9+8] += fz0*(*delta0).dz+fz1*(*delta1).dz+fz2*(*delta2).dz;
+      }
+  }
 }
 
-void back_oop_cos(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad) {
+void back_oop_cos(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad, double *avtens) {
   dlist_row_type *delta0, *delta1, *delta2;
   delta0 = deltas + (*ic).i0;
   delta1 = deltas + (*ic).i1;
   delta2 = deltas + (*ic).i2;
-  back_oop_cos_low(delta0, delta1, delta2, value, grad);
+  back_oop_cos_low(ic, delta0, delta1, delta2, value, grad, avtens);
 }
 
-void back_oop_meancos(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad) {
+void back_oop_meancos(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad, double *avtens) {
   dlist_row_type *delta0, *delta1, *delta2;
   double tmp;
   delta0 = deltas + (*ic).i0;
   delta1 = deltas + (*ic).i1;
   delta2 = deltas + (*ic).i2;
   tmp = forward_oop_cos_low((double*)delta0, (double*)delta1, (double*)delta2);
-  back_oop_cos_low(delta0, delta1, delta2, tmp, grad/3.0);
+  back_oop_cos_low(ic, delta0, delta1, delta2, tmp, grad/3.0, avtens);
   tmp = forward_oop_cos_low((double*)delta2, (double*)delta0,(double*)delta1);
-  back_oop_cos_low(delta2, delta0, delta1, tmp, grad/3.0);
+  back_oop_cos_low(ic, delta2, delta0, delta1, tmp, grad/3.0, avtens);
   tmp = forward_oop_cos_low((double*)delta1, (double*)delta2, (double*)delta0);
-  back_oop_cos_low(delta1, delta2, delta0, tmp, grad/3.0);
+  back_oop_cos_low(ic, delta1, delta2, delta0, tmp, grad/3.0, avtens);
 }
 
-void back_oop_angle_low(dlist_row_type *delta0, dlist_row_type *delta1, dlist_row_type *delta2, double value, double grad) {
+void back_oop_angle_low(iclist_row_type* ic, dlist_row_type *delta0, dlist_row_type *delta1, dlist_row_type *delta2, double value, double grad, double *avtens) {
   double tmp = sin(value);
   if (tmp!=0.0) tmp = -grad/tmp;
-  back_oop_cos_low(delta0, delta1, delta2, cos(value), tmp);
+  back_oop_cos_low(ic, delta0, delta1, delta2, cos(value), tmp, avtens);
 }
 
-void back_oop_angle(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad) {
+void back_oop_angle(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad, double *avtens) {
   dlist_row_type *delta0, *delta1, *delta2;
   delta0 = deltas + (*ic).i0;
   delta1 = deltas + (*ic).i1;
   delta2 = deltas + (*ic).i2;
-  back_oop_angle_low(delta0, delta1, delta2, value, grad);
+  back_oop_angle_low(ic, delta0, delta1, delta2, value, grad, avtens);
 }
 
-void back_oop_meanangle(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad) {
+void back_oop_meanangle(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad, double *avtens) {
   dlist_row_type *delta0, *delta1, *delta2;
   double tmp;
   delta0 = deltas + (*ic).i0;
   delta1 = deltas + (*ic).i1;
   delta2 = deltas + (*ic).i2;
   tmp = forward_oop_angle_low((double*)delta0, (double*)delta1, (double*)delta2);
-  back_oop_angle_low(delta0, delta1, delta2, tmp, grad/3.0);
+  back_oop_angle_low(ic, delta0, delta1, delta2, tmp, grad/3.0, avtens);
   tmp = forward_oop_angle_low((double*)delta2, (double*)delta0, (double*)delta1);
-  back_oop_angle_low(delta2, delta0, delta1, tmp, grad/3.0);
+  back_oop_angle_low(ic, delta2, delta0, delta1, tmp, grad/3.0, avtens);
   tmp = forward_oop_angle_low((double*)delta1, (double*)delta2, (double*)delta0);
-  back_oop_angle_low(delta1, delta2, delta0, tmp, grad/3.0);
+  back_oop_angle_low(ic, delta1, delta2, delta0, tmp, grad/3.0, avtens);
 }
 
-void back_oop_distance(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad) {
+void back_oop_distance(iclist_row_type* ic, dlist_row_type* deltas, double value, double grad, double *avtens) {
   dlist_row_type *delta0, *delta1, *delta2;
   double n[3], d0_cross_d1[3], d1_cross_d2[3], d2_cross_d0[3];
   double n_norm, n_dot_d2, fac, tmp0;
+  double fx0, fx1, fx2, fy0, fy1, fy2, fz0, fz1, fz2;
 
   delta0 = deltas + (*ic).i0;
   delta1 = deltas + (*ic).i1;
@@ -475,15 +673,75 @@ void back_oop_distance(iclist_row_type* ic, dlist_row_type* deltas, double value
   fac = grad/n_norm*(*ic).sign0*(*ic).sign1*(*ic).sign2;
   tmp0 = n_dot_d2/n_norm/n_norm;
 
-  (*delta0).gx += fac*( d1_cross_d2[0] -  tmp0*( (*delta1).dy*n[2] - (*delta1).dz*n[1] ) );
-  (*delta0).gy += fac*( d1_cross_d2[1] -  tmp0*( (*delta1).dz*n[0] - (*delta1).dx*n[2] ) );
-  (*delta0).gz += fac*( d1_cross_d2[2] -  tmp0*( (*delta1).dx*n[1] - (*delta1).dy*n[0] ) );
-  (*delta1).gx += fac*( d2_cross_d0[0] -  tmp0*( (*delta0).dz*n[1] - (*delta0).dy*n[2] ) );
-  (*delta1).gy += fac*( d2_cross_d0[1] -  tmp0*( (*delta0).dx*n[2] - (*delta0).dz*n[0] ) );
-  (*delta1).gz += fac*( d2_cross_d0[2] -  tmp0*( (*delta0).dy*n[0] - (*delta0).dx*n[1] ) );
-  (*delta2).gx += fac*( d0_cross_d1[0] );
-  (*delta2).gy += fac*( d0_cross_d1[1] );
-  (*delta2).gz += fac*( d0_cross_d1[2] );
+  fx0 = fac*( d1_cross_d2[0] -  tmp0*( (*delta1).dy*n[2] - (*delta1).dz*n[1] ) );
+  fy0 = fac*( d1_cross_d2[1] -  tmp0*( (*delta1).dz*n[0] - (*delta1).dx*n[2] ) );
+  fz0 = fac*( d1_cross_d2[2] -  tmp0*( (*delta1).dx*n[1] - (*delta1).dy*n[0] ) );
+  fx1 = fac*( d2_cross_d0[0] -  tmp0*( (*delta0).dz*n[1] - (*delta0).dy*n[2] ) );
+  fy1 = fac*( d2_cross_d0[1] -  tmp0*( (*delta0).dx*n[2] - (*delta0).dz*n[0] ) );
+  fz1 = fac*( d2_cross_d0[2] -  tmp0*( (*delta0).dy*n[0] - (*delta0).dx*n[1] ) );
+  fx2 = fac*( d0_cross_d1[0] );
+  fy2 = fac*( d0_cross_d1[1] );
+  fz2 = fac*( d0_cross_d1[2] );
+
+  (*delta0).gx += fx0;
+  (*delta0).gy += fy0;
+  (*delta0).gz += fz0;
+  (*delta1).gx += fx1;
+  (*delta1).gy += fy1;
+  (*delta1).gz += fz1;
+  (*delta2).gx += fx2;
+  (*delta2).gy += fy2;
+  (*delta2).gz += fz2;
+
+  if (avtens != NULL) {
+      // Forces from l on i, factor 0.25 for four-body
+      fx0 *= 0.25;
+      fy0 *= 0.25;
+      fz0 *= 0.25;
+      // Forces from l on j, factor 0.25 for four-body
+      fx1 *= 0.25;
+      fy1 *= 0.25;
+      fz1 *= 0.25;
+      // Forces from l on k, factor 0.25 for four-body
+      fx2 *= 0.25;
+      fy2 *= 0.25;
+      fz2 *= 0.25;
+      // Figure out (i,j,k,l) indexes of particles present in ic
+      long indexes[4], i;
+      if ((*ic).sign0==1) {
+        indexes[0] = (*delta0).i;
+        indexes[1] = (*delta0).j;
+      }
+      else {
+        indexes[1] = (*delta0).i;
+        indexes[0] = (*delta0).j;
+      }
+      if ((*ic).sign1==1) {
+        indexes[2] = (*delta1).i;
+      }
+      else {
+        indexes[2] = (*delta1).j;
+      }
+      if ((*ic).sign2==1) {
+        indexes[3] = (*delta2).i;
+      }
+      else {
+        indexes[3] = (*delta2).j;
+      }
+      printf("INDEXES %5ld %5ld %5ld %5ld\n",indexes[0],indexes[1],indexes[2],indexes[3]);
+      // Fill atomic virial tensors for every particle in ic
+      for (i=0;i<4;i++) {
+          avtens[indexes[i]*9  ] += fx0*(*delta0).dx+fx1*(*delta1).dx+fx2*(*delta2).dx;
+          avtens[indexes[i]*9+1] += fx0*(*delta0).dy+fx1*(*delta1).dy+fx2*(*delta2).dy;
+          avtens[indexes[i]*9+2] += fx0*(*delta0).dz+fx1*(*delta1).dz+fx2*(*delta2).dz;
+          avtens[indexes[i]*9+3] += fy0*(*delta0).dx+fy1*(*delta1).dx+fy2*(*delta2).dx;
+          avtens[indexes[i]*9+4] += fy0*(*delta0).dy+fy1*(*delta1).dy+fy2*(*delta2).dy;
+          avtens[indexes[i]*9+5] += fy0*(*delta0).dz+fy1*(*delta1).dz+fy2*(*delta2).dz;
+          avtens[indexes[i]*9+6] += fz0*(*delta0).dx+fz1*(*delta1).dx+fz2*(*delta2).dx;
+          avtens[indexes[i]*9+7] += fz0*(*delta0).dy+fz1*(*delta1).dy+fz2*(*delta2).dy;
+          avtens[indexes[i]*9+8] += fz0*(*delta0).dz+fz1*(*delta1).dz+fz2*(*delta2).dz;
+      }
+  }
 }
 
 ic_back_type ic_back_fns[11] = {
@@ -491,9 +749,9 @@ ic_back_type ic_back_fns[11] = {
   back_oop_cos, back_oop_meancos, back_oop_angle, back_oop_meanangle, back_oop_distance
 };
 
-void iclist_back(dlist_row_type* deltas, iclist_row_type* ictab, long nic) {
+void iclist_back(dlist_row_type* deltas, iclist_row_type* ictab, long nic, double *avtens) {
   long i;
   for (i=0; i<nic; i++) {
-    ic_back_fns[ictab[i].kind](ictab + i, deltas, ictab[i].value, ictab[i].grad);
+    ic_back_fns[ictab[i].kind](ictab + i, deltas, ictab[i].value, ictab[i].grad, avtens);
   }
 }

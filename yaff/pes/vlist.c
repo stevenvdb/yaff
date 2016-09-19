@@ -23,7 +23,9 @@
 
 
 #include <math.h>
+#include <stdlib.h>
 #include "vlist.h"
+#include "constants.h"
 
 typedef double (*v_forward_type)(vlist_row_type*, iclist_row_type*);
 
@@ -90,13 +92,23 @@ v_forward_type v_forward_fns[10] = {
   forward_chebychev4, forward_chebychev6
 };
 
-double vlist_forward(iclist_row_type* ictab, vlist_row_type* vtab, long nv) {
+// Array containing fractions of natural numbers
+const double M_FRACTIONS[9] = {0.0,1.0,0.5,M_THIRD,0.25,0.2,M_SIXTH,M_SEVENTH,0.125};
+
+double vlist_forward(iclist_row_type* ictab, vlist_row_type* vtab, long nv, double *aenergies) {
   long i;
-  double energy;
+  double energy, aenergy;
   energy = 0.0;
   for (i=0; i<nv; i++) {
     vtab[i].energy = v_forward_fns[vtab[i].kind](vtab + i, ictab);
     energy += vtab[i].energy;
+    if (aenergies != NULL) {
+        aenergy = vtab[i].energy*M_FRACTIONS[vtab[i].ni];
+        aenergies[vtab[i].i0] += aenergy;
+        aenergies[vtab[i].i1] += aenergy;
+        if (vtab[i].ni>2) aenergies[vtab[i].i2] += aenergy;
+        if (vtab[i].ni>3) aenergies[vtab[i].i3] += aenergy;
+    }
   }
   return energy;
 }

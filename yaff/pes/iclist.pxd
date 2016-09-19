@@ -32,4 +32,4 @@ cdef extern from "iclist.h":
         double value, grad
 
     void iclist_forward(dlist.dlist_row_type* deltas, iclist_row_type* ictab, long nic)
-    void iclist_back(dlist.dlist_row_type* deltas, iclist_row_type* ictab, long nic)
+    void iclist_back(dlist.dlist_row_type* deltas, iclist_row_type* ictab, long nic, double* avtens)

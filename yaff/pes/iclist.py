@@ -136,14 +136,16 @@ class InternalCoordinateList(object):
         """
         iclist_forward(self.dlist.deltas, self.ictab, self.nic)
 
-    def back(self):
+    def back(self, avtens=None):
         """Transform the derivative of the energy (in ``self.ictab``) to
            derivatives of the energy towards the components of the relative
            vectors in ``self.dlist``.
 
            The actual computation is carried out by a low-level C routine.
+
+           avtens: (natomx3x3) NumPy array to store atomic virial tensors
         """
-        iclist_back(self.dlist.deltas, self.ictab, self.nic)
+        iclist_back(self.dlist.deltas, self.ictab, self.nic, avtens)
 
 
 class InternalCoordinate(object):
