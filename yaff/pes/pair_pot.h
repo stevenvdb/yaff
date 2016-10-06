@@ -224,11 +224,14 @@ double pair_data_olpslater1s1s_get_corr_c(pair_pot_type *pair_pot);
 typedef struct {
   double *N;
   double *widths;
+  double *charges;
+  double *apars;
+  double *bpars;
   double ct_scale;
   double width_power;
 } pair_data_chargetransferslater1s1s_type;
 
-void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double ct_scale, double width_power);
+void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double *charges, double *apars, double *bpars, double ct_scale, double width_power);
 double pair_fn_chargetransferslater1s1s(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *gg, double *g_cart);
 double pair_data_chargetransferslater1s1s_get_ct_scale(pair_pot_type *pair_pot);
 double pair_data_chargetransferslater1s1s_get_width_power(pair_pot_type *pair_pot);

@@ -1030,7 +1030,7 @@ double pair_data_olpslater1s1s_get_corr_c(pair_pot_type *pair_pot) {
   return (*(pair_data_olpslater1s1s_type*)((*pair_pot).pair_data)).corr_c;
 }
 
-void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double ct_scale, double width_power) {
+void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *slater1s_widths, double *slater1s_N, double *charges, double *apars, double *bpars, double ct_scale, double width_power) {
   pair_data_chargetransferslater1s1s_type *pair_data;
   pair_data = (pair_data_chargetransferslater1s1s_type*)malloc(sizeof(pair_data_chargetransferslater1s1s_type));
   (*pair_pot).pair_data = pair_data;
@@ -1038,6 +1038,9 @@ void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *sl
     (*pair_pot).pair_fn = pair_fn_chargetransferslater1s1s;
     (*pair_data).widths = slater1s_widths;
     (*pair_data).N = slater1s_N;
+    (*pair_data).charges = charges;
+    (*pair_data).apars = apars;
+    (*pair_data).bpars = bpars;
     (*pair_data).ct_scale = ct_scale;
     (*pair_data).width_power = width_power;
   }
@@ -1045,19 +1048,30 @@ void pair_data_chargetransferslater1s1s_init(pair_pot_type *pair_pot, double *sl
 
 
 double pair_fn_chargetransferslater1s1s(void *pair_data, long center_index, long other_index, double d, double *dr, double *g, double *gg,  double *g_cart) {
-  double a, b, Na, Nb, fac, olp;
+  double a, b, Na, Nb, qa, qb, Aa, Ab, Ba, Bb, fac, olp;
   double pot = 0.0;
-  a  = (*(pair_data_olpslater1s1s_type*)pair_data).widths[center_index];
-  b  = (*(pair_data_olpslater1s1s_type*)pair_data).widths[other_index];
-  Na = (*(pair_data_olpslater1s1s_type*)pair_data).N[center_index];
-  Nb = (*(pair_data_olpslater1s1s_type*)pair_data).N[other_index];
+  a  = (*(pair_data_chargetransferslater1s1s_type*)pair_data).widths[center_index];
+  b  = (*(pair_data_chargetransferslater1s1s_type*)pair_data).widths[other_index];
+  Na = (*(pair_data_chargetransferslater1s1s_type*)pair_data).N[center_index];
+  Nb = (*(pair_data_chargetransferslater1s1s_type*)pair_data).N[other_index];
+  qa = (*(pair_data_chargetransferslater1s1s_type*)pair_data).charges[center_index];
+  qb = (*(pair_data_chargetransferslater1s1s_type*)pair_data).charges[other_index];
+  Aa = (*(pair_data_chargetransferslater1s1s_type*)pair_data).apars[center_index];
+  Ab = (*(pair_data_chargetransferslater1s1s_type*)pair_data).apars[other_index];
+  Ba = (*(pair_data_chargetransferslater1s1s_type*)pair_data).bpars[center_index];
+  Bb = (*(pair_data_chargetransferslater1s1s_type*)pair_data).bpars[other_index];
+
 
   olp = slaterolp_0_0(a, b, d, g, gg);
-  fac = -Na*Nb*(*(pair_data_chargetransferslater1s1s_type*)pair_data).ct_scale;
-  fac *= ( (Na/Nb)*(Na/Nb) + (Nb/Na)*(Nb/Na) ) / (a*b);
-  pot = fac*olp*d*d;
-  if (gg != NULL) *gg = fac*((*gg)*d*d + 4.0*(*g) + 2.0*olp/d/d);
-  if (g != NULL) *g = fac*(2.0*olp+(*g)*d*d);
+/*  fac = -Na*Nb*(*(pair_data_chargetransferslater1s1s_type*)pair_data).ct_scale*exp(Aa+qa*Ba+Ab+qb*Bb);*/
+  fac = Na*Nb*(*(pair_data_chargetransferslater1s1s_type*)pair_data).ct_scale*(Aa+qa*Ba+Ab+qb*Bb);
+/*  fac *= ( (Na/Nb)*(Na/Nb) + (Nb/Na)*(Nb/Na) ) / (a*b);*/
+/*  pot = fac*olp*d*d;*/
+/*  if (gg != NULL) *gg = fac*((*gg)*d*d + 4.0*(*g) + 2.0*olp/d/d);*/
+/*  if (g != NULL) *g = fac*(2.0*olp+(*g)*d*d);*/
+  pot = fac*olp;
+  if (gg != NULL) *gg *= fac;
+  if (g != NULL) *g *= fac;
   return pot;
 
 

@@ -2232,7 +2232,7 @@ cdef class PairPotChargeTransferSlater1s1s(PairPot):
         Slater densities and a certain power of the product of Slater widths,
         modified by the relative populations:
 
-            E = ct_scale * slater_overlap / (sigma1*sigma2)**width_power * [ (N1/N2)**2 + (N2/N1)**2]
+            E = ct_scale * slater_overlap * ( A[Z0] + q0*B[Z0] + A[Z1] + q1*B[Z1] )
 
         **Arguments:**
 
@@ -2241,6 +2241,15 @@ cdef class PairPotChargeTransferSlater1s1s(PairPot):
 
         slater1s_N
             An array of Slater populations, shape = (natom,)
+
+        charges
+            An array of charges, shape = (natom,)
+
+        apars
+            An array of A parameters, shape = (natom,)
+
+        bpars
+            An array of B parameters, shape = (natom,)
 
         ct_scale
             A scaling factor to relate overlap and exchange energy
@@ -2260,24 +2269,35 @@ cdef class PairPotChargeTransferSlater1s1s(PairPot):
     '''
     cdef np.ndarray _c_slater1s_widths
     cdef np.ndarray _c_slater1s_N
+    cdef np.ndarray _c_charges
+    cdef np.ndarray _c_apars
+    cdef np.ndarray _c_bpars
     name = 'chargetransferslater1s1s'
 
     def __cinit__(self, np.ndarray[double, ndim=1] slater1s_widths,
-                  np.ndarray[double, ndim=1] slater1s_N, double ct_scale,
+                  np.ndarray[double, ndim=1] slater1s_N, np.ndarray[double, ndim=1] charges,
+                  np.ndarray[double, ndim=1] apars, np.ndarray[double, ndim=1] bpars,
+                  double ct_scale,
                   double rcut, Truncation tr=None, SwitchOn sw=None,
                   double width_power=1.0):
         assert slater1s_widths.flags['C_CONTIGUOUS']
         assert slater1s_N.flags['C_CONTIGUOUS']
+        assert charges.flags['C_CONTIGUOUS']
+        assert apars.flags['C_CONTIGUOUS']
+        assert bpars.flags['C_CONTIGUOUS']
         # Precompute some factors here???
         pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
         self.set_truncation(tr)
         self.set_switchon(sw)
         assert width_power == 1
-        pair_pot.pair_data_chargetransferslater1s1s_init(self._c_pair_pot, <double*>slater1s_widths.data,  <double*>slater1s_N.data, ct_scale, width_power)
+        pair_pot.pair_data_chargetransferslater1s1s_init(self._c_pair_pot, <double*>slater1s_widths.data,  <double*>slater1s_N.data, <double*>charges.data,  <double*>apars.data,  <double*>bpars.data, ct_scale, width_power)
         if not pair_pot.pair_pot_ready(self._c_pair_pot):
             raise MemoryError()
         self._c_slater1s_widths = slater1s_widths
         self._c_slater1s_N = slater1s_N
+        self._c_charges = charges
+        self._c_apars = apars
+        self._c_bpars = bpars
 
     def log(self):
         '''Print suitable initialization info on screen.'''
@@ -2302,6 +2322,24 @@ cdef class PairPotChargeTransferSlater1s1s(PairPot):
         return self._c_slater1s_N.view()
 
     slater1s_N = property(_get_slater1s_N)
+
+    def _get_charges(self):
+        '''The atomic charges'''
+        return self._c_charges.view()
+
+    charges = property(_get_charges)
+
+    def _get_apars(self):
+        '''The atomic charges'''
+        return self._c_apars.view()
+
+    apars = property(_get_apars)
+
+    def _get_bpars(self):
+        '''The atomic charges'''
+        return self._c_bpars.view()
+
+    bpars = property(_get_bpars)
 
     def _get_ct_scale(self):
         '''The ct_scale parameter in the charge transfer energy expression'''
