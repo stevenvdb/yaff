@@ -27,5 +27,6 @@
 #include "cell.h"
 
 double compute_grid3d(double* center, cell_type *cell, double* egrid, long* shape);
+double compute_grid3d_tricubic(double* center, cell_type *cell, double* egrid, long* shape);
 
 #endif

@@ -179,6 +179,42 @@ double compute_ewald_reci(double *pos, long natom, double *charges,
   return energy;
 }
 
+
+double compute_ewald_reci_guest(double *pos, double *charges,
+                          double* kvectors, double* cosfacs, double* sinfacs,
+                          double *gpos, long natom, long gx, long gy, long gz) {
+  long g0, g1, g2, i, index;
+  double energy, x, c, s, cosfac, sinfac;
+  energy = 0.0;
+  for (g0=0; g0 < gx; g0++) {
+    for (g1=0; g1 < gy; g1++) {
+      for (g2=0; g2 < gz; g2++) {
+        index = g0*gy*gz + g1*gz + g2;
+        cosfac = 0.0;
+        sinfac = 0.0;
+        if (cosfacs[index]==0.0 && sinfacs[index]==0.0) { continue; }
+        for (i=0; i < natom; i++) {
+            x = kvectors[3*index+0]*pos[3*i] + kvectors[3*index+1]*pos[3*i+1] + kvectors[3*index+2]*pos[3*i+2];
+            c = charges[i]*cos(x);
+            s = charges[i]*sin(x);
+            cosfac += c;
+            sinfac += s;
+            if (gpos != NULL) {
+                gpos[3*i+0] -= cosfacs[index]*kvectors[3*index+0]*s;
+                gpos[3*i+0] += sinfacs[index]*kvectors[3*index+0]*c;
+                gpos[3*i+1] -= cosfacs[index]*kvectors[3*index+1]*s;
+                gpos[3*i+1] += sinfacs[index]*kvectors[3*index+1]*c;
+                gpos[3*i+2] -= cosfacs[index]*kvectors[3*index+2]*s;
+                gpos[3*i+2] += sinfacs[index]*kvectors[3*index+2]*c;
+            }
+        }
+        energy += cosfacs[index]*cosfac + sinfacs[index]*sinfac;
+      }
+    }
+  }
+  return energy;
+}
+
 //TODO: lot of code overlap with original Ewald
 //At the moment the idea is to make separate code for systems with monopoles and dipoles.
 //If it turns out that adding zero dipoles does not increase computational cost, this separate

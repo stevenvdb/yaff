@@ -43,15 +43,16 @@ import numpy as np
 
 from yaff.log import log, timer
 from yaff.pes.ext import compute_ewald_reci, compute_ewald_reci_dd, compute_ewald_corr, \
-    compute_ewald_corr_dd, PairPotEI, PairPotLJ, PairPotMM3, PairPotGrimme, compute_grid3d
+    compute_ewald_corr_dd, PairPotEI, PairPotLJ, PairPotMM3, PairPotGrimme, compute_grid3d, \
+    compute_grid3d_tricubic, compute_ewald_reci_guest
 from yaff.pes.dlist import DeltaList
 from yaff.pes.iclist import InternalCoordinateList
 from yaff.pes.vlist import ValenceList
 __all__ = [
     'ForcePart', 'ForceField', 'ForcePartPair', 'ForcePartEwaldReciprocal',
-    'ForcePartEwaldReciprocalDD', 'ForcePartEwaldCorrectionDD',
+    'ForcePartEwaldReciprocalGuest', 'ForcePartEwaldReciprocalDD', 'ForcePartEwaldCorrectionDD',
     'ForcePartEwaldCorrection', 'ForcePartEwaldNeutralizing',
-    'ForcePartValence', 'ForcePartPressure', 'ForcePartGrid',
+    'ForcePartValence', 'ForcePartPressure', 'ForcePartGrid', 'ForcePartGridCubic',
     'ForcePartPolarizationEnergy',
 ]
 
@@ -418,6 +419,80 @@ class ForcePartEwaldReciprocal(ForcePart):
                 self.system.pos, self.system.charges, self.system.cell, self.alpha,
                 self.gmax, self.gcut, self.dielectric, gpos, self.work, vtens, hess
             )
+
+class ForcePartEwaldReciprocalGuest(ForcePartEwaldReciprocal):
+    '''Reciprocal contribution to Ewald specific to first nguest+1 atoms'''
+    def prepare(self, nguest=0):
+        with timer.section('Ewald ReciGP.'):
+            self.nguest = nguest
+            self.cosfacs = np.zeros(2*self.gmax+1)
+            self.sinfacs = np.zeros(2*self.gmax+1)
+            self.prefacs = np.zeros(2*self.gmax+1)
+            self.kvectors = np.zeros((2*self.gmax[0]+1, 2*self.gmax[1]+1, 2*self.gmax[2]+1, 3))
+            self.dots = np.zeros((2*self.gmax[0]+1, 2*self.gmax[1]+1, 2*self.gmax[2]+1, self.nguest+1))
+            self.cos = np.zeros(self.dots.shape)
+            self.sin = np.zeros(self.dots.shape)
+            self.cosfac_guests = np.zeros(2*self.gmax+1)
+            self.sinfac_guests = np.zeros(2*self.gmax+1)
+            self.kvecs = self.system.cell.gvecs*2.0*np.pi
+            fac1 = 8.0*np.pi/self.system.cell.volume
+            fac2 = 0.25/self.alpha/self.alpha
+            kcut = (self.gcut*2.0*np.pi)**2
+            energy = 0.0
+            for g0 in xrange(-self.gmax[0],self.gmax[0]+1):
+                for g1 in xrange(-self.gmax[1],self.gmax[1]+1):
+                    for g2 in xrange(0,self.gmax[2]+1):
+                        if g2==0:
+                            if g1<0: continue
+                            if g1==0 and g0<=0: continue
+                            if g1==0 and g0==0: continue
+                        k = np.dot(self.kvecs.T, np.array([g0,g1,g2]))
+                        ksq = np.dot(k,k)
+                        if ksq > kcut: continue
+                        index = self.gmax[0]+g0,self.gmax[1]+g1,self.gmax[2]+g2
+                        self.kvectors[index] = k
+                        self.prefacs[index] = np.exp(-fac2*ksq)/ksq*fac1
+    #                    for iatom in xrange(self.nguest+1,self.system.natom):
+    #                        self.cosfacs[index] += self.system.charges[iatom]*np.cos(np.dot(k,self.system.pos[iatom]))
+    #                        self.sinfacs[index] += self.system.charges[iatom]*np.sin(np.dot(k,self.system.pos[iatom]))
+    #                    self.cosfacs[index] *= np.exp(-fac2*ksq)/ksq*fac1
+    #                    self.sinfacs[index] *= np.exp(-fac2*ksq)/ksq*fac1
+            dots = np.zeros((self.kvectors.shape[0],self.kvectors.shape[1],self.kvectors.shape[2],self.system.pos[self.nguest+1:].shape[0]))
+            np.einsum('ghja,ia->ghji',self.kvectors, self.system.pos[self.nguest+1:], out=dots)
+            self.cosfacs = np.einsum('i,ghji',self.system.charges[self.nguest+1:],np.cos(dots))
+            self.sinfacs = np.einsum('i,ghji',self.system.charges[self.nguest+1:],np.sin(dots))
+            self.cosfacs *= self.prefacs
+            self.sinfacs *= self.prefacs
+
+    def _internal_compute(self, gpos, vtens, hess):
+        if vtens is not None:
+            raise NotImplementedError('Virial tensor not implemented for ForcePartEwaldReciprocalGuest')
+        if hess is not None:
+            raise NotImplementedError('Hessian computation not implemented for ForcePartEwaldReciprocalGuest')
+        with timer.section('Ewald ReciG.'):
+#            self.dots[:] = np.einsum('ghja,ia->ghji',self.kvectors, self.system.pos[:self.nguest+1])
+#            self.cos[:] = np.cos(self.dots)
+#            self.sin[:] = np.sin(self.dots)
+#            self.cosfac_guests[:] = np.einsum('i,ghji',self.system.charges[:self.nguest+1],self.cos)
+#            self.sinfac_guests[:] = np.einsum('i,ghji',self.system.charges[:self.nguest+1],self.sin)
+#    #        print np.einsum('ghj,ghj',self.cosfac_guests,self.cosfacs)
+#    #        print np.einsum('ghj,ghj',self.sinfac_guests,self.sinfacs)
+#            e = np.einsum('ghj,ghj',self.cosfac_guests,self.cosfacs) + np.einsum('ghj,ghj',self.sinfac_guests,self.sinfacs)
+#            if gpos is not None:
+#                tmp = np.einsum('ghj,ghjk,ghji',self.sinfacs,self.kvectors[:,:,:,:],self.cos)
+#                tmp -= np.einsum('ghj,ghjk,ghji',self.cosfacs,self.kvectors[:,:,:,:],self.sin)
+#                gpos[:self.nguest+1] += tmp*np.repeat(self.system.charges[:self.nguest+1],3).reshape((-1,3))
+            e = compute_ewald_reci_guest(self.system.pos[:self.nguest+1], self.system.charges[:self.nguest+1],
+                self.kvectors, self.cosfacs, self.sinfacs, gpos )
+#            assert False
+
+    #            print gpos[:self.nguest+1]
+    #            assert False
+    #            self.cosfac_guests[:] = np.einsum('i,ghji',self.system.charges[:self.nguest+1],np.cos(self.dots))*self.kvectors[i]
+    #            self.sinfac_guests[:] = np.einsum('i,ghji',self.system.charges[:self.nguest+1],np.sin(self.dots))*self.kvectors[i]
+    #            gpos
+
+        return e
 
 
 class ForcePartEwaldReciprocalDD(ForcePart):
@@ -863,5 +938,53 @@ class ForcePartGrid(ForcePart):
             result = 0
             for i in xrange(self.system.natom):
                 grid = self.grids[self.system.get_ffatype(i)]
-                result += compute_grid3d(self.system.pos[i], cell, grid)
+                energy = compute_grid3d(self.system.pos[i], cell, grid)
+                result += energy
+            return result
+
+
+class ForcePartGridCubic(ForcePartGrid):
+    '''Energies obtained by grid interpolation.'''
+    def __init__(self, system, grids):
+        '''
+           **Arguments:**
+
+           system
+                An instance of the ``System`` class.
+
+           grids
+                A dictionary with (ffatype, grid) items. Each grid must be a
+                three-dimensional array with energies.
+
+           This force part is only applicable to systems that are 3D periodic.
+        '''
+        if system.cell.nvec != 3:
+            raise ValueError('The system must be 3d periodic for the grid term.')
+        for grid in grids.itervalues():
+            if grid.ndim != 4:
+                raise ValueError('The energy grids must be 4D numpy arrays.')
+            if grid.shape[3] != 8:
+                raise ValueError('The energy grids must have 8 entries in 4th dimension.')
+        ForcePart.__init__(self, 'grid', system)
+        self.system = system
+        self.grids = grids
+        if log.do_medium:
+            with log.section('FPINIT'):
+                log('Force part: %s' % self.name)
+                log.hline()
+
+    def _internal_compute(self, gpos, vtens, hess):
+        with timer.section('Grid'):
+            if vtens is not None:
+                raise NotImplementedError('Cell deformation are not supported by ForcePartGrid')
+            if hess is not None:
+                raise NotImplementedError('Hessian computation not implemented for ForcePartGrid')
+            cell = self.system.cell
+            result = 0
+            for i in xrange(self.system.natom):
+                grid = self.grids[self.system.get_ffatype(i)]
+                energy = compute_grid3d_tricubic(self.system.pos[i], cell, grid)
+                from molmod.units import kjmol
+                print energy/kjmol
+                result += energy
             return result

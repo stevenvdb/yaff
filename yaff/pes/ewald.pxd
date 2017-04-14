@@ -32,6 +32,10 @@ cdef extern from "ewald.h":
                               long *gmax, double gcut, double dielectric,
                               double *gpos, double *work, double* vtens, double* hess)
 
+    double compute_ewald_reci_guest(double *pos, double *charges,
+                          double* kvectors, double* cosfacs, double* sinfacs,
+                          double *gpos, long natom, long gx, long gy, long gz)
+
     double compute_ewald_reci_dd(double *pos, long natom, double *charges, double *dipoles,
                               cell.cell_type *unitcell, double alpha,
                               long *gmax, double gcut, double *gpos,

@@ -38,7 +38,7 @@ from yaff.pes.ext import PairPotEI, PairPotLJ, PairPotMM3, PairPotExpRep, \
     PairPotOlpSlater1s1s, PairPotChargeTransferSlater1s1s
 from yaff.pes.ff import ForcePartPair, ForcePartValence, \
     ForcePartEwaldReciprocal, ForcePartEwaldCorrection, \
-    ForcePartEwaldNeutralizing
+    ForcePartEwaldNeutralizing, ForcePartEwaldReciprocalGuest
 from yaff.pes.iclist import Bond, BendAngle, BendCos, \
     UreyBradley, DihedAngle, DihedCos, OopAngle, OopMeanAngle, OopCos, \
     OopMeanCos, OopDist
@@ -193,15 +193,20 @@ class FFArgs(object):
             pass
         elif self.reci_ei == 'ewald':
             if system.cell.nvec == 3:
-                # Reciprocal-space electrostatics
-                part_ewald_reci = ForcePartEwaldReciprocal(system, alpha, self.gcut_scale*alpha, dielectric)
-                self.parts.append(part_ewald_reci)
-                # Ewald corrections
-                part_ewald_corr = ForcePartEwaldCorrection(system, alpha, scalings, dielectric)
-                self.parts.append(part_ewald_corr)
-                # Neutralizing background
-                part_ewald_neut = ForcePartEwaldNeutralizing(system, alpha, dielectric)
-                self.parts.append(part_ewald_neut)
+                if self.nguest > -1:
+                    part_ewald_reci = ForcePartEwaldReciprocalGuest(system, alpha, gcut=self.gcut_scale*alpha)
+                    part_ewald_reci.prepare(self.nguest)
+                    self.parts.append(part_ewald_reci)
+                else:
+                    # Reciprocal-space electrostatics
+                    part_ewald_reci = ForcePartEwaldReciprocal(system, alpha, self.gcut_scale*alpha, dielectric)
+                    self.parts.append(part_ewald_reci)
+                    # Ewald corrections
+                    part_ewald_corr = ForcePartEwaldCorrection(system, alpha, scalings, dielectric)
+                    self.parts.append(part_ewald_corr)
+                    # Neutralizing background
+                    part_ewald_neut = ForcePartEwaldNeutralizing(system, alpha, dielectric)
+                    self.parts.append(part_ewald_neut)
             elif system.cell.nvec != 0:
                 raise NotImplementedError('The ewald summation is only available for 3D periodic systems.')
         else:

@@ -57,7 +57,7 @@ __all__ = [
     'compute_ewald_reci', 'compute_ewald_reci_dd',
     'compute_ewald_corr', 'compute_ewald_corr_dd', 'dlist_forward',
     'dlist_back', 'iclist_forward', 'iclist_back', 'iclist_jacobian', 'iclist_hessian',
-    'vlist_forward', 'vlist_back', 'vlist_hessian', 'compute_grid3d',
+    'vlist_forward', 'vlist_back', 'vlist_hessian', 'compute_grid3d', 'compute_grid3d_tricubic',
     'SwitchErrorFunction'
 ]
 
@@ -2569,6 +2569,48 @@ def compute_ewald_reci(np.ndarray[double, ndim=2] pos,
                                     my_vtens, my_hess)
 
 
+def compute_ewald_reci_guest(np.ndarray[double, ndim=2] pos,
+                       np.ndarray[double, ndim=1] charges,
+                       np.ndarray[double, ndim=4] kvectors,
+                       np.ndarray[double, ndim=3] cosfacs,
+                       np.ndarray[double, ndim=3] sinfacs,
+                       np.ndarray[double, ndim=2] gpos):
+    '''Compute the reciprocal interaction term in the Ewald summation scheme
+    '''
+    cdef double *my_gpos
+
+    assert pos.flags['C_CONTIGUOUS']
+    assert pos.shape[1] == 3
+    assert charges.flags['C_CONTIGUOUS']
+    assert charges.shape[0] == pos.shape[0]
+    assert kvectors.flags['C_CONTIGUOUS']
+    assert kvectors.shape[3] == 3
+    assert cosfacs.flags['C_CONTIGUOUS']
+    assert cosfacs.shape[0] == kvectors.shape[0]
+    assert cosfacs.shape[1] == kvectors.shape[1]
+    assert cosfacs.shape[2] == kvectors.shape[2]
+    assert sinfacs.flags['C_CONTIGUOUS']
+    assert sinfacs.shape[0] == kvectors.shape[0]
+    assert sinfacs.shape[1] == kvectors.shape[1]
+    assert sinfacs.shape[2] == kvectors.shape[2]
+
+    if gpos is None:
+        my_gpos = NULL
+        my_work = NULL
+    else:
+        assert gpos.flags['C_CONTIGUOUS']
+        assert gpos.shape[1] == 3
+#        assert gpos.shape[0] == pos.shape[0]
+        my_gpos = <double*>gpos.data
+
+    return ewald.compute_ewald_reci_guest(<double*>pos.data,
+                                    <double*>charges.data,
+                                    <double*>kvectors.data,
+                                    <double*>cosfacs.data,
+                                    <double*>sinfacs.data,
+                                    my_gpos, len(pos), kvectors.shape[0],kvectors.shape[1],kvectors.shape[2])
+
+
 def compute_ewald_reci_dd(np.ndarray[double, ndim=2] pos,
                        np.ndarray[double, ndim=1] charges,
                        np.ndarray[double, ndim=2] dipoles,
@@ -3333,3 +3375,8 @@ def compute_grid3d(np.ndarray[double, ndim=1] center, Cell unitcell, np.ndarray[
     assert center.flags['C_CONTIGUOUS']
     assert center.shape[0] == 3
     return grid.compute_grid3d(<double*>center.data, unitcell._c_cell, <double*>egrid.data, <long*>egrid.shape)
+
+def compute_grid3d_tricubic(np.ndarray[double, ndim=1] center, Cell unitcell, np.ndarray[double, ndim=4] egrid):
+    assert center.flags['C_CONTIGUOUS']
+    assert center.shape[0] == 3
+    return grid.compute_grid3d_tricubic(<double*>center.data, unitcell._c_cell, <double*>egrid.data, <long*>egrid.shape)
