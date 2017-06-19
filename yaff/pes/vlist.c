@@ -92,13 +92,13 @@ double forward_polysix(vlist_row_type* term, iclist_row_type* ictab) {
 double forward_mm3quartic(vlist_row_type* term, iclist_row_type* ictab) {
   double x = ictab[(*term).ic0].value - (*term).par1;
   double x2 = x*x;
-  return 0.5*((*term).par0)*x2*(1-2.55*x+3.793125*x2);
+  return 0.5*((*term).par0)*x2*(1-1.3494018811649997*x+1.0621831715201235*x2);
 }
 
 double forward_mm3bend(vlist_row_type* term, iclist_row_type* ictab) {
   double x = ictab[(*term).ic0].value - (*term).par1;
   double x2 = x*x;
-  return 0.5*((*term).par0)*x2*(1-0.14*x+0.000056*x2-0.0000007*x2*x+0.000000022*x2*x2);
+  return 0.5*((*term).par0)*x2*(1-0.8021409131831525*x+0.18383715560065766*x2-0.1316636641700936*x2*x+0.23708998569690343*x2*x2);
 }
 
 double forward_bonddoublewell(vlist_row_type* term, iclist_row_type* ictab) {
@@ -199,15 +199,13 @@ void back_polysix(vlist_row_type* term, iclist_row_type* ictab) {
 
 void back_mm3quartic(vlist_row_type* term, iclist_row_type* ictab) {
   double q = (ictab[(*term).ic0].value - (*term).par1);
-  ictab[(*term).ic0].grad += ((*term).par0)*(q-3.825*q*q+7.58625*q*q*q);
+  ictab[(*term).ic0].grad += ((*term).par0)*(q-2.0241028217474994*q*q+2.124366343040247*q*q*q);
 }
 
 void back_mm3bend(vlist_row_type* term, iclist_row_type* ictab) {
   double q = (ictab[(*term).ic0].value - (*term).par1);
   double q2 = q*q;
-  ictab[(*term).ic0].grad += ((*term).par0)*(q-0.21*q2+0.000112*q2*q-0.00000175*q2*q2+0.000000066*q2*q2*q);
-
-
+  ictab[(*term).ic0].grad += ((*term).par0)*(q-1.2032113697747286*q2+0.36767431120131533*q2*q-0.32915916042523397*q2*q2+0.7112699570907103*q2*q2*q);
 }
 
 void back_bonddoublewell(vlist_row_type* term, iclist_row_type* ictab) {
