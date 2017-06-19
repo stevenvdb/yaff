@@ -308,8 +308,7 @@ double pair_fn_ex6d(void *pair_data, long center_index, long other_index, double
   damp = 1.0/(1.0+6.0*x14);
   e -= C*d6*damp;
   if (g != NULL) {
-    *g = -A/(rho*d)*exp(-d/rho);
-    *g -= -6.0*d6/(d*d)*damp*(1.0+14.0*damp);
+    *g = -A/(rho*d)*exp(-d/rho)+ C*6.0*d6/(d*d)*damp*(1.0-14.0*x14*damp);
   }
   return e;
 }
@@ -641,6 +640,34 @@ double pair_data_ei_get_dielectric(pair_pot_type *pair_pot) {
   return (*(pair_data_ei_type*)((*pair_pot).pair_data)).dielectric;
 }
 
+
+void pair_data_eigezelter_init(pair_pot_type *pair_pot, double *charges, double *radii, double rcut, double dielectric) {
+  pair_data_eigezelter_type *pair_data;
+  pair_data = malloc(sizeof(pair_data_eigezelter_type));
+  (*pair_pot).pair_data = pair_data;
+  if (pair_data != NULL) {
+    (*pair_pot).pair_fn = pair_fn_eigezelter;
+    (*pair_data).charges = charges;
+    (*pair_data).radii = radii;
+    (*pair_data).rcut = rcut;
+    (*pair_data).dielectric = dielectric;
+  }
+}
+
+double pair_fn_eigezelter(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *g_cart) {
+  double pot, alpha, qprod, J, rcut;
+  qprod = (
+    (*(pair_data_eigezelter_type*)pair_data).charges[center_index]*
+    (*(pair_data_eigezelter_type*)pair_data).charges[other_index]
+  ) / (*(pair_data_eigezelter_type*)pair_data).dielectric;
+  alpha = 1.0/sqrt( (*(pair_data_eigezelter_type*)pair_data).radii[center_index] * (*(pair_data_eigezelter_type*)pair_data).radii[center_index] +
+               (*(pair_data_eigezelter_type*)pair_data).radii[other_index] * (*(pair_data_eigezelter_type*)pair_data).radii[other_index] );
+  rcut = (*(pair_data_eigezelter_type*)pair_data).rcut;
+  J = erf(alpha*d)/d - erf(alpha*rcut)/rcut + (erf(alpha*rcut)/(rcut*rcut) - M_TWO_DIV_SQRT_PI*alpha*exp(-alpha*alpha*rcut*rcut)/rcut ) * (d-rcut);
+  pot = qprod*J;
+  if (g != NULL) *g = qprod*(M_TWO_DIV_SQRT_PI*alpha*(exp(-alpha*alpha*d*d)/d - exp(-alpha*alpha*rcut*rcut)/rcut) + (erf(alpha*rcut)/(rcut*rcut) - erf(alpha*d)/(d*d)))/d;
+  return pot;
+}
 
 void pair_data_eidip_init(pair_pot_type *pair_pot, double *charges, double *dipoles, double alpha, double *radii, double *radii2) {
   pair_data_eidip_type *pair_data;

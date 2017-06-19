@@ -50,6 +50,7 @@ __all__ = [
     'PairPotLJ', 'PairPotMM3', 'PairPotEx6d', 'PairPotGrimme', 'PairPotExpRep',
     'PairPotQMDFFRep', 'PairPotLJCross', 'PairPotDampDisp',
     'PairPotDisp68BJDamp', 'PairPotEI', 'PairPotEIDip',
+    'PairPotEIGezelter',
     'PairPotEiSlater1s1sCorr', 'PairPotEiSlater1sp1spCorr',
     'PairPotOlpSlater1s1s','PairPotChargeTransferSlater1s1s',
     'compute_ewald_reci', 'compute_ewald_reci_dd',  'compute_ewald_corr_dd',
@@ -1850,6 +1851,70 @@ cdef class PairPotEI(PairPot):
         return pair_pot.pair_data_ei_get_dielectric(self._c_pair_pot)
 
     dielectric = property(_get_dielectric)
+
+
+cdef class PairPotEIGezelter(PairPot):
+    r'''Gezelter shift damping for electrostatic interactions
+
+        **Arguments:**
+
+        charges
+            An array of atomic charges, shape = (natom,)
+
+        radii
+            An array of atomic radii, shape = (natom,). The charge distribution
+            of atom :math:`i` with radius :math:`r_i` centered at :math:`\mathbf{R}_i`
+            is of a Gaussian shape:
+            :math:`\rho_i (\mathbf{r}) = q_i\left(\frac{1}{\pi r_i^2}\right)^{3/2} \exp{-\frac{|\mathbf{r} -\mathbf{R}_i |^2}{r_i^2}}`
+            When the atomic radius equals zero, the charge distribution becomes a
+            point monopole.
+
+        rcut
+            The cutoff radius
+
+        **Optional arguments:**
+
+        tr
+            The truncation scheme, an instance of a subclass of ``Truncation``.
+            When not given, no truncation is applied
+
+        dielectric
+            A relative dielectric permitivity that just scales the Coulomb
+            interaction.
+    '''
+    cdef np.ndarray _c_charges
+    cdef np.ndarray _c_radii
+    cdef double _c_rcut
+    name = 'ei'
+
+    def __cinit__(self, np.ndarray[double, ndim=1] charges, np.ndarray[double, ndim=1] radii,
+                  double rcut, Truncation tr=None, double dielectric=1.0):
+        assert charges.flags['C_CONTIGUOUS']
+        pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
+        self.set_truncation(tr)
+        #No atomic radii specified, set to point charges
+        if radii is None: radii = np.zeros( np.shape(charges) )
+        pair_pot.pair_data_eigezelter_init(self._c_pair_pot, <double*>charges.data, <double*>radii.data, rcut, dielectric)
+        if not pair_pot.pair_pot_ready(self._c_pair_pot):
+            raise MemoryError()
+        self._c_charges = charges
+        self._c_radii = radii
+        self._c_rcut = rcut
+
+    def _get_charges(self):
+        '''The atomic charges'''
+        return self._c_charges.view()
+
+    charges = property(_get_charges)
+
+    def _get_radii(self):
+        '''The atomic radii'''
+        return self._c_radii.view()
+
+    radii = property(_get_radii)
+
+    def log(self):
+        pass
 
 
 cdef class PairPotEIDip(PairPot):
