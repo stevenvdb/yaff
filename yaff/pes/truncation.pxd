@@ -36,5 +36,8 @@ cdef extern from "truncation.h":
     trunc_scheme_type* switch3_new(double width)
     double switch3_get_width(trunc_scheme_type *trunc_scheme)
 
+    trunc_scheme_type* switch5_new(double width)
+    double switch5_get_rs(trunc_scheme_type *trunc_scheme)
+
     double trunc_scheme_fn(trunc_scheme_type *trunc_scheme, double d, double rcut, double *g)
     void trunc_scheme_free(trunc_scheme_type *trunc_scheme)

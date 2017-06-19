@@ -90,6 +90,46 @@ double switch3_get_width(trunc_scheme_type *trunc_scheme){
 }
 
 
+
+double switch5(double d, double rcut, double rs, double *g) {
+  double result, c0, c1, c2, c3, c4, c5, denom;
+  if (d < rcut) {
+    if (d < rs) {
+      result = 1.0;
+      if (g != NULL) *g = 0.0;
+    } else {
+      c0 = rcut*rcut*rcut*(rcut*rcut-5.0*rcut*rs+10.0*rs*rs);
+      c1 = -30.0*rcut*rcut*rs*rs;
+      c2 = 30.0*(rcut*rcut*rs+rcut*rs*rs);
+      c3 = -10.0*(rcut*rcut+4.0*rcut*rs+rs*rs);
+      c4 = 15.0*(rcut+rs);
+      c5 = -6.0;
+      denom = 1.0/(rcut-rs);
+      denom = denom*denom*denom*denom*denom;
+      result = (c0+d*(c1+d*(c2+d*(c3+d*(c4+d*c5)))))*denom;
+      if (g != NULL) *g = (c1+d*(2.0*c2+d*(3.0*c3+d*(4.0*c4+d*5.0*c5))))*denom;
+    }
+  } else {
+    result = 0.0;
+    if (g != NULL) *g = 0.0;
+  }
+  return result;
+}
+
+trunc_scheme_type* switch5_new(double rs) {
+  trunc_scheme_type* result;
+  result = malloc(sizeof(trunc_scheme_type));
+  if (result != NULL) {
+    (*result).trunc_fn = switch5;
+    (*result).par = rs;
+  }
+  return result;
+}
+
+double switch5_get_rs(trunc_scheme_type *trunc_scheme){
+  return (*trunc_scheme).par;
+}
+
 double trunc_scheme_fn(trunc_scheme_type *trunc_scheme, double d, double rcut, double *g) {
   return (*trunc_scheme).trunc_fn(d, rcut, (*trunc_scheme).par, g);
 }

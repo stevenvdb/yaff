@@ -46,7 +46,7 @@ from yaff.log import log
 
 __all__ = [
     'Cell', 'nlist_status_init', 'nlist_build', 'nlist_status_finish',
-    'nlist_recompute', 'nlist_inc_r', 'Hammer', 'Switch3', 'PairPot',
+    'nlist_recompute', 'nlist_inc_r', 'Hammer', 'Switch3', 'Switch5', 'PairPot',
     'PairPotLJ', 'PairPotMM3', 'PairPotEx6d', 'PairPotGrimme', 'PairPotExpRep',
     'PairPotQMDFFRep', 'PairPotLJCross', 'PairPotDampDisp',
     'PairPotDisp68BJDamp', 'PairPotEI', 'PairPotEIDip',
@@ -590,6 +590,38 @@ cdef class Switch3(Truncation):
         '''
         return 'switch3 %s' % log.length(self.width)
 
+
+cdef class Switch5(Truncation):
+    r'''DLPOLY truncation scheme.
+
+       **Arguments:**
+
+       rs
+            The point where switching starts, :math:`rs`, in the mathematical expression below.
+
+       .. math:: t_\text{switch5}(d) = \left\lbrace \begin{array}{ll}
+                     1 & \text{if } d < r_\text{cut} - w \\
+                     c_0+c_1d+c_2d^2+c_3d^3+c_4d^4+c_5d^5 & \text{if } d < r_\text{cut} \\
+                     0 & \text{if } d >= r_\text{cut}
+                 \end{array} \right.
+    '''
+    def __cinit__(self, double rs):
+        self._c_trunc_scheme = truncation.switch5_new(rs)
+        if self._c_trunc_scheme is NULL:
+            raise MemoryError
+
+    def _get_rs(self):
+        '''The rs parameter of the truncation scheme'''
+        return truncation.switch5_get_rs(self._c_trunc_scheme)
+
+    rs = property(_get_rs)
+
+    def get_log(self):
+        '''get_log()
+
+           Return a string suitable for the screen logger
+        '''
+        return 'switch5 %s' % log.length(self.rs)
 
 #
 # Pair potentials
