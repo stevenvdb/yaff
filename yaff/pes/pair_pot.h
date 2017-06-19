@@ -80,6 +80,19 @@ double pair_fn_mm3(void *pair_data, long center_index, long other_index, double 
 
 
 typedef struct {
+  long nffatype;
+  long *ffatype_ids;
+  double *A;
+  double *rho;
+  double *C;
+  double *R;
+} pair_data_ex6d_type;
+
+
+void pair_data_ex6d_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *A, double *rho, double *C, double *R);
+double pair_fn_ex6d(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *g_cart);
+
+typedef struct {
   double *r0;
   double *c6;
 } pair_data_grimme_type;

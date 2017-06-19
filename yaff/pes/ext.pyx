@@ -47,7 +47,7 @@ from yaff.log import log
 __all__ = [
     'Cell', 'nlist_status_init', 'nlist_build', 'nlist_status_finish',
     'nlist_recompute', 'nlist_inc_r', 'Hammer', 'Switch3', 'PairPot',
-    'PairPotLJ', 'PairPotMM3', 'PairPotGrimme', 'PairPotExpRep',
+    'PairPotLJ', 'PairPotMM3', 'PairPotEx6d', 'PairPotGrimme', 'PairPotExpRep',
     'PairPotQMDFFRep', 'PairPotLJCross', 'PairPotDampDisp',
     'PairPotDisp68BJDamp', 'PairPotEI', 'PairPotEIDip',
     'PairPotEiSlater1s1sCorr', 'PairPotEiSlater1sp1spCorr',
@@ -850,6 +850,114 @@ cdef class PairPotMM3(PairPot):
         return self._c_onlypaulis.view()
 
     onlypaulis = property(_get_onlypaulis)
+
+
+cdef class PairPotEx6d(PairPot):
+    r'''Exponential repulsion with damped r^-6 dispersion, as used in MOF-FF
+
+       **Energy:**
+
+       .. math:: E_\text{Ex6d} = \sum_{i=1}^{N} \sum_{j=i+1}^{N} s_{ij} \left[
+                 \A_{ij} \exp\left(-\frac{d_{ij}}{\rho_{ij}}\right) - \frac{C_{ij}}{d_{ij}^6}\frac{1}{1+6\left(\frac{R_{ij}}{d_{ij}}\right)^{14} }
+                 \right]
+
+       with
+
+       .. math:: s_{ij} = \text{the short-range scaling factor}
+
+       **Arguments:**
+
+       A
+            An array with A parameters, one for each atom pair of atom types, shape (natom,natom)
+
+       rho
+            An array with rho parameters, one for each atom pair of atom types, shape (natom,natom)
+
+       C
+            An array with C parameters, one for each atom pair of atom types, shape (natom,natom)
+
+       R
+            An array with R parameters, one for each atom pair of atom types, shape (natom,natom)
+
+       rcut
+            The cutoff radius
+
+       **Optional arguments:**
+
+       tr
+            The truncation scheme, an instance of a subclass of ``Truncation``.
+            When not given, no truncation is applied
+    '''
+    cdef long _c_nffatype
+    cdef np.ndarray _c_A
+    cdef np.ndarray _c_rho
+    cdef np.ndarray _c_C
+    cdef np.ndarray _c_R
+    name = 'ex6d'
+
+    def __cinit__(self, np.ndarray[long, ndim=1] ffatype_ids not None,
+                  np.ndarray[double, ndim=2] A not None,
+                  np.ndarray[double, ndim=2] rho not None,
+                  np.ndarray[double, ndim=2] C not None,
+                  np.ndarray[double, ndim=2] R not None,
+                  double rcut, Truncation tr=None):
+        assert A.flags['C_CONTIGUOUS']
+        assert rho.flags['C_CONTIGUOUS']
+        assert C.flags['C_CONTIGUOUS']
+        assert R.flags['C_CONTIGUOUS']
+        nffatype = A.shape[0]
+        assert ffatype_ids.min() >= 0
+        assert ffatype_ids.max() < nffatype
+        assert A.shape[1] == nffatype
+        assert rho.shape[0] == nffatype
+        assert rho.shape[1] == nffatype
+        assert C.shape[0] == nffatype
+        assert C.shape[1] == nffatype
+        assert R.shape[0] == nffatype
+        assert R.shape[1] == nffatype
+        pair_pot.pair_pot_set_rcut(self._c_pair_pot, rcut)
+        self.set_truncation(tr)
+        pair_pot.pair_data_ex6d_init(
+            self._c_pair_pot, nffatype, <long*> ffatype_ids.data,
+            <double*> A.data, <double*> rho.data,
+            <double*> C.data, <double*> R.data,
+        )
+        if not pair_pot.pair_pot_ready(self._c_pair_pot):
+            raise MemoryError()
+        self._c_nffatype = nffatype
+        self._c_A = A
+        self._c_rho = rho
+        self._c_C = C
+        self._c_R = R
+
+
+    def log(self):
+        '''Write some suitable post-initialization screen log'''
+        pass
+
+    def _get_A(self):
+        '''The array with A parameters'''
+        return self._c_A.view()
+
+    A = property(_get_A)
+
+    def _get_rho(self):
+        '''The array with rho parameters'''
+        return self._c_rho.view()
+
+    rho = property(_get_rho)
+
+    def _get_C(self):
+        '''The array with C parameters'''
+        return self._c_C.view()
+
+    C = property(_get_C)
+
+    def _get_R(self):
+        '''The array with R parameters'''
+        return self._c_R.view()
+
+    R = property(_get_R)
 
 
 cdef class PairPotGrimme(PairPot):

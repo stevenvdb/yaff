@@ -268,6 +268,52 @@ double pair_fn_mm3(void *pair_data, long center_index, long other_index, double 
 }
 
 
+void pair_data_ex6d_init(pair_pot_type *pair_pot, long nffatype, long* ffatype_ids, double *A, double *rho, double *C, double *R) {
+  pair_data_ex6d_type *pair_data;
+  pair_data = malloc(sizeof(pair_data_ex6d_type));
+  (*pair_pot).pair_data = pair_data;
+  if (pair_data != NULL) {
+    (*pair_pot).pair_fn = pair_fn_ex6d;
+    (*pair_data).nffatype = nffatype;
+    (*pair_data).ffatype_ids = ffatype_ids;
+    (*pair_data).A = A;
+    (*pair_data).rho = rho;
+    (*pair_data).C = C;
+    (*pair_data).R = R;
+  }
+}
+
+
+double pair_fn_ex6d(void *pair_data, long center_index, long other_index, double d, double *delta, double *g, double *g_cart) {
+  long i;
+  double A, rho, C, R, x, e, d6, damp, x14;
+  // Load parameters from data structure and mix
+  pair_data_ex6d_type *pd;
+  pd = (pair_data_ex6d_type*)pair_data;
+  i = (*pd).ffatype_ids[center_index]*(*pd).nffatype + (*pd).ffatype_ids[other_index];
+  A = (*pd).A[i];
+  rho = (*pd).rho[i];
+  C = (*pd).C[i];
+  R = (*pd).R[i];
+  // Exponential part
+  e = A*exp(-d/rho);
+  // Dispersion part
+  d6 = 1.0/d;
+  d6 *= d6;
+  d6 = d6*d6*d6;
+  // Damping part
+  x = R/d;
+  x14 = x*x*x*x*x*x*x;
+  x14 *= x14;
+  damp = 1.0/(1.0+6.0*x14);
+  e -= C*d6*damp;
+  if (g != NULL) {
+    *g = -A/(rho*d)*exp(-d/rho);
+    *g -= -6.0*d6/(d*d)*damp*(1.0+14.0*damp);
+  }
+  return e;
+}
+
 
 void pair_data_grimme_init(pair_pot_type *pair_pot, double *r0, double *c6) {
   pair_data_grimme_type *pair_data;
